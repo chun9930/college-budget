@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import EmptyState from '../components/EmptyState';
 import FormField from '../components/FormField';
+import MetricStrip from '../components/MetricStrip';
 import PrimaryButton from '../components/PrimaryButton';
 
 const DEFAULT_RECORD = {
@@ -20,62 +21,197 @@ const DEFAULT_RECURRING = {
   memo: '',
 };
 
+function getMonthKey(date) {
+  const current = new Date(date);
+  return `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function getRecentPaymentMethodByCategory(records) {
+  return records.reduce((accumulator, record) => {
+    if (!record.category || accumulator[record.category]) {
+      return accumulator;
+    }
+
+    accumulator[record.category] = record.paymentMethod || '카드';
+    return accumulator;
+  }, {});
+}
+
+function getDateKey(date = new Date()) {
+  const current = new Date(date);
+  return `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}-${String(
+    current.getDate()
+  ).padStart(2, '0')}`;
+}
+
+function formatSelectedDate(dateKey) {
+  const current = new Date(`${dateKey}T00:00:00`);
+  return current.toLocaleDateString('ko-KR', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    weekday: 'long',
+  });
+}
+
+function buildDateTimeFromDateKey(dateKey) {
+  return `${dateKey}T00:00:00`;
+}
+
 export default function ExpenseRecords({
   expenseRecords,
-  expenseTemplates,
   recurringExpenses,
+  selectedDateKey,
   onAddExpenseRecord,
-  onAddExpenseTemplate,
-  onRemoveExpenseTemplate,
+  onUpdateExpenseRecord,
+  onDeleteExpenseRecord,
   onAddRecurringExpense,
+  onUpdateRecurringExpense,
+  onDeleteRecurringExpense,
 }) {
   const [recordForm, setRecordForm] = useState(DEFAULT_RECORD);
   const [recurringForm, setRecurringForm] = useState(DEFAULT_RECURRING);
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [lastPaymentMethod, setLastPaymentMethod] = useState(DEFAULT_RECORD.paymentMethod);
+  const [editingExpenseId, setEditingExpenseId] = useState(null);
+  const [editingRecurringId, setEditingRecurringId] = useState(null);
 
-  const latestRecords = useMemo(() => expenseRecords.slice(0, 5), [expenseRecords]);
+  const recentRecords = useMemo(() => expenseRecords.slice(0, 10), [expenseRecords]);
+  const recentPaymentMethodsByCategory = useMemo(
+    () => getRecentPaymentMethodByCategory(expenseRecords),
+    [expenseRecords]
+  );
+
+  const currentMonthKey = useMemo(() => getMonthKey(new Date()), []);
+
+  const currentMonthTotal = useMemo(
+    () =>
+      expenseRecords
+        .filter((record) => getMonthKey(record.date) === currentMonthKey)
+        .reduce((sum, record) => sum + Number(record.amount || 0), 0),
+    [currentMonthKey, expenseRecords]
+  );
 
   const updateRecordField = (field) => (event) => {
+    const value = event.target.value;
     setRecordForm((current) => ({
       ...current,
-      [field]: event.target.value,
+      [field]: value,
     }));
   };
 
-  const updateRecurringField = (field) => (event) => {
-    setRecurringForm((current) => ({
+  const updateCategoryField = (event) => {
+    const nextCategory = event.target.value;
+    const nextPaymentMethod =
+      recentPaymentMethodsByCategory[nextCategory] || lastPaymentMethod || DEFAULT_RECORD.paymentMethod;
+
+    setRecordForm((current) => ({
       ...current,
-      [field]: event.target.value,
+      category: nextCategory,
+      paymentMethod: nextPaymentMethod,
     }));
+  };
+
+  const updatePaymentMethodField = (event) => {
+    const nextPaymentMethod = event.target.value;
+    setLastPaymentMethod(nextPaymentMethod);
+    setRecordForm((current) => ({
+      ...current,
+      paymentMethod: nextPaymentMethod,
+    }));
+  };
+
+  const fillFromRecord = (record) => {
+    setRecordForm({
+      amount: String(record.amount || ''),
+      category: record.category || DEFAULT_RECORD.category,
+      paymentMethod: record.paymentMethod || DEFAULT_RECORD.paymentMethod,
+      type: record.type || DEFAULT_RECORD.type,
+      memo: record.memo || '',
+    });
+    setLastPaymentMethod(record.paymentMethod || DEFAULT_RECORD.paymentMethod);
+  };
+
+  const fillExpenseFromItem = (item) => {
+    setRecordForm({
+      amount: String(item.amount || ''),
+      category: item.category || DEFAULT_RECORD.category,
+      paymentMethod: item.paymentMethod || DEFAULT_RECORD.paymentMethod,
+      type: item.type || DEFAULT_RECORD.type,
+      memo: item.memo || '',
+    });
+    setLastPaymentMethod(item.paymentMethod || DEFAULT_RECORD.paymentMethod);
+    setAdvancedOpen(true);
+    setEditingExpenseId(item.id);
+  };
+
+  const cancelExpenseEdit = () => {
+    setEditingExpenseId(null);
+    setRecordForm(DEFAULT_RECORD);
+  };
+
+  const fillRecurringFromItem = (item) => {
+    setRecurringForm({
+      name: item.name || '',
+      amount: String(item.amount || ''),
+      category: item.category || DEFAULT_RECURRING.category,
+      paymentDay: String(item.paymentDay || ''),
+      paymentMethod: item.paymentMethod || DEFAULT_RECURRING.paymentMethod,
+      memo: item.memo || '',
+    });
+    setEditingRecurringId(item.id);
+  };
+
+  const cancelRecurringEdit = () => {
+    setEditingRecurringId(null);
+    setRecurringForm(DEFAULT_RECURRING);
   };
 
   const saveExpense = (event) => {
     event.preventDefault();
-    onAddExpenseRecord(recordForm);
-    setRecordForm(DEFAULT_RECORD);
+    if (editingExpenseId) {
+      onUpdateExpenseRecord(editingExpenseId, recordForm);
+      setLastPaymentMethod(recordForm.paymentMethod || DEFAULT_RECORD.paymentMethod);
+      cancelExpenseEdit();
+      return;
+    }
+
+    const resolvedDateKey = selectedDateKey || getDateKey(new Date());
+    onAddExpenseRecord({
+      ...recordForm,
+      date: buildDateTimeFromDateKey(resolvedDateKey),
+    });
+    setLastPaymentMethod(recordForm.paymentMethod || DEFAULT_RECORD.paymentMethod);
+    setRecordForm((current) => ({
+      ...DEFAULT_RECORD,
+      paymentMethod: current.paymentMethod || DEFAULT_RECORD.paymentMethod,
+    }));
   };
 
-  const saveTemplate = () => {
-    onAddExpenseTemplate({
-      id: crypto.randomUUID(),
-      ...recordForm,
-    });
+  const removeExpense = (expenseId) => {
+    onDeleteExpenseRecord(expenseId);
+    if (editingExpenseId === expenseId) {
+      cancelExpenseEdit();
+    }
   };
 
   const saveRecurring = (event) => {
     event.preventDefault();
+    if (editingRecurringId) {
+      onUpdateRecurringExpense(editingRecurringId, recurringForm);
+      cancelRecurringEdit();
+      return;
+    }
+
     onAddRecurringExpense(recurringForm);
     setRecurringForm(DEFAULT_RECURRING);
   };
 
-  const loadTemplate = (template) => {
-    setRecordForm({
-      amount: template.amount,
-      category: template.category,
-      paymentMethod: template.paymentMethod,
-      type: template.type || '일반',
-      memo: template.memo || '',
-    });
+  const removeRecurring = (recurringId) => {
+    onDeleteRecurringExpense(recurringId);
+    if (editingRecurringId === recurringId) {
+      cancelRecurringEdit();
+    }
   };
 
   return (
@@ -83,13 +219,46 @@ export default function ExpenseRecords({
       <div className="page-hero">
         <div>
           <h1 className="page-title">지출 기록</h1>
-          <p className="page-subtitle">MVP 입력은 최소화하고, 필요할 때만 고급 옵션을 펼칩니다.</p>
+          <p className="page-subtitle">MVP 입력은 최소화하고, 최근 기록을 눌러 빠르게 다시 입력할 수 있습니다.</p>
         </div>
       </div>
+
+      <div className="calendar-date-banner">
+        <strong>선택 날짜</strong>
+        <span>{formatSelectedDate(selectedDateKey || getDateKey(new Date()))}</span>
+      </div>
+
+      <MetricStrip
+        items={[
+          {
+            title: '이번 달 지출',
+            value: `${Math.round(currentMonthTotal).toLocaleString()}원`,
+            note: '월간 소비 합계',
+          },
+          {
+            title: '빠른 입력',
+            value: `${recentRecords.length}개`,
+            note: '최근 기록 10개 기준',
+          },
+          {
+            title: '정기지출',
+            value: `${recurringExpenses.length}개`,
+            note: '결제일 기준 자동 반영',
+          },
+        ]}
+      />
 
       <div className="grid-2">
         <form className="card form-grid" onSubmit={saveExpense}>
           <h2 className="section-title">MVP 입력</h2>
+          {editingExpenseId ? (
+            <div className="alert-banner">
+              <strong>지출 기록 수정 중</strong>
+              <div className="muted">
+                {Number(recordForm.amount || 0).toLocaleString()}원 · {recordForm.category}
+              </div>
+            </div>
+          ) : null}
 
           <FormField id="expense-amount" label="금액">
             <input
@@ -105,7 +274,7 @@ export default function ExpenseRecords({
             <select
               id="expense-category"
               value={recordForm.category}
-              onChange={updateRecordField('category')}
+              onChange={updateCategoryField}
             >
               <option>식비</option>
               <option>교통</option>
@@ -119,7 +288,7 @@ export default function ExpenseRecords({
             <select
               id="expense-method"
               value={recordForm.paymentMethod}
-              onChange={updateRecordField('paymentMethod')}
+              onChange={updatePaymentMethodField}
             >
               <option>카드</option>
               <option>현금</option>
@@ -154,28 +323,44 @@ export default function ExpenseRecords({
                   onChange={updateRecordField('memo')}
                 />
               </FormField>
-
-              <div className="form-actions">
-                <PrimaryButton type="button" variant="ghost" onClick={saveTemplate}>
-                  템플릿 저장
-                </PrimaryButton>
-              </div>
             </div>
           ) : null}
 
           <div className="form-actions">
-            <PrimaryButton type="submit">지출 저장</PrimaryButton>
+            {editingExpenseId ? (
+              <>
+                <button className="text-button" type="button" onClick={cancelExpenseEdit}>
+                  수정 취소
+                </button>
+                <PrimaryButton type="submit">지출 수정 저장</PrimaryButton>
+              </>
+            ) : (
+              <PrimaryButton type="submit">지출 저장</PrimaryButton>
+            )}
           </div>
         </form>
 
         <form className="card form-grid" onSubmit={saveRecurring}>
           <h2 className="section-title">정기지출 등록</h2>
+          {editingRecurringId ? (
+            <div className="alert-banner">
+              <strong>정기지출 수정 중</strong>
+              <div className="muted">
+                {recurringForm.name || '항목명 없음'} · {Number(recurringForm.amount || 0).toLocaleString()}원
+              </div>
+            </div>
+          ) : null}
 
           <FormField id="recurring-name" label="항목명">
             <input
               id="recurring-name"
               value={recurringForm.name}
-              onChange={updateRecurringField('name')}
+              onChange={(event) =>
+                setRecurringForm((current) => ({
+                  ...current,
+                  name: event.target.value,
+                }))
+              }
             />
           </FormField>
 
@@ -185,7 +370,12 @@ export default function ExpenseRecords({
               type="number"
               inputMode="numeric"
               value={recurringForm.amount}
-              onChange={updateRecurringField('amount')}
+              onChange={(event) =>
+                setRecurringForm((current) => ({
+                  ...current,
+                  amount: event.target.value,
+                }))
+              }
             />
           </FormField>
 
@@ -197,7 +387,12 @@ export default function ExpenseRecords({
               min="1"
               max="31"
               value={recurringForm.paymentDay}
-              onChange={updateRecurringField('paymentDay')}
+              onChange={(event) =>
+                setRecurringForm((current) => ({
+                  ...current,
+                  paymentDay: event.target.value,
+                }))
+              }
             />
           </FormField>
 
@@ -205,7 +400,12 @@ export default function ExpenseRecords({
             <select
               id="recurring-category"
               value={recurringForm.category}
-              onChange={updateRecurringField('category')}
+              onChange={(event) =>
+                setRecurringForm((current) => ({
+                  ...current,
+                  category: event.target.value,
+                }))
+              }
             >
               <option>고정지출</option>
               <option>식비</option>
@@ -218,7 +418,12 @@ export default function ExpenseRecords({
             <select
               id="recurring-method"
               value={recurringForm.paymentMethod}
-              onChange={updateRecurringField('paymentMethod')}
+              onChange={(event) =>
+                setRecurringForm((current) => ({
+                  ...current,
+                  paymentMethod: event.target.value,
+                }))
+              }
             >
               <option>카드</option>
               <option>현금</option>
@@ -230,23 +435,75 @@ export default function ExpenseRecords({
             <textarea
               id="recurring-memo"
               value={recurringForm.memo}
-              onChange={updateRecurringField('memo')}
+              onChange={(event) =>
+                setRecurringForm((current) => ({
+                  ...current,
+                  memo: event.target.value,
+                }))
+              }
             />
           </FormField>
 
           <div className="form-actions">
-            <PrimaryButton type="submit">정기지출 저장</PrimaryButton>
+            {editingRecurringId ? (
+              <>
+                <button className="text-button" type="button" onClick={cancelRecurringEdit}>
+                  수정 취소
+                </button>
+                <PrimaryButton type="submit">정기지출 수정 저장</PrimaryButton>
+              </>
+            ) : (
+              <PrimaryButton type="submit">정기지출 저장</PrimaryButton>
+            )}
           </div>
         </form>
       </div>
 
+      <section className="card stack">
+        <h2 className="section-title">일반 지출 기록</h2>
+        {expenseRecords.length > 0 ? (
+          <div className="list">
+            {expenseRecords.map((item) => (
+              <div key={item.id} className="list-item recurring-item">
+                <div>
+                  <strong>{Number(item.amount || 0).toLocaleString()}원</strong>
+                  <div className="muted">
+                    {item.category} · {item.paymentMethod} · {item.type}
+                  </div>
+                  <div className="muted">{new Date(item.date).toLocaleDateString('ko-KR')}</div>
+                </div>
+                <div className="inline-actions">
+                  <button type="button" className="text-button" onClick={() => fillExpenseFromItem(item)}>
+                    수정
+                  </button>
+                  <button type="button" className="text-button" onClick={() => removeExpense(item.id)}>
+                    삭제
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <EmptyState
+            title="일반 지출 기록이 없습니다"
+            description="금액, 카테고리, 결제수단을 입력해 지출을 저장하면 여기에 표시됩니다."
+          />
+        )}
+      </section>
+
       <div className="grid-2">
         <section className="card stack">
-          <h2 className="section-title">최근 기록</h2>
-          {latestRecords.length > 0 ? (
+          <h2 className="section-title">최근 기록으로 빠른 입력</h2>
+          <p className="muted">최근 기록을 누르면 금액, 카테고리, 결제수단이 바로 채워집니다.</p>
+          {recentRecords.length > 0 ? (
             <div className="list">
-              {latestRecords.map((record) => (
-                <div key={record.id} className="list-item">
+              {recentRecords.map((record) => (
+                <button
+                  key={record.id}
+                  type="button"
+                  className="list-item recent-record-button"
+                  onClick={() => fillFromRecord(record)}
+                >
                   <div>
                     <strong>{Number(record.amount || 0).toLocaleString()}원</strong>
                     <div className="muted">
@@ -256,46 +513,47 @@ export default function ExpenseRecords({
                   <time className="muted" dateTime={record.date}>
                     {new Date(record.date).toLocaleDateString('ko-KR')}
                   </time>
-                </div>
+                </button>
               ))}
             </div>
           ) : (
             <EmptyState
               title="기록이 없습니다"
-              description="첫 지출을 저장하면 최근 기록이 여기에 표시됩니다."
+              description="첫 지출을 저장하면 최근 기록으로 빠른 입력 영역이 여기에 표시됩니다."
             />
           )}
         </section>
 
         <section className="card stack">
-          <h2 className="section-title">템플릿</h2>
-          {expenseTemplates.length > 0 ? (
+          <h2 className="section-title">정기지출</h2>
+          {recurringExpenses.length > 0 ? (
             <div className="list">
-              {expenseTemplates.map((template) => (
-                <div key={template.id} className="list-item">
-                  <button className="text-button" type="button" onClick={() => loadTemplate(template)}>
-                    {template.category} · {Number(template.amount || 0).toLocaleString()}원
-                  </button>
-                  <button
-                    className="text-button"
-                    type="button"
-                    onClick={() => onRemoveExpenseTemplate(template.id)}
-                  >
-                    삭제
-                  </button>
+              {recurringExpenses.map((item) => (
+                <div key={item.id} className="list-item recurring-item">
+                  <div>
+                    <strong>{item.name}</strong>
+                    <div className="muted">
+                      {Number(item.amount || 0).toLocaleString()}원 · 매월 {item.paymentDay}일 · {item.paymentMethod}
+                    </div>
+                    <div className="muted">{item.category}</div>
+                  </div>
+                  <div className="inline-actions">
+                    <button type="button" className="text-button" onClick={() => fillRecurringFromItem(item)}>
+                      수정
+                    </button>
+                    <button type="button" className="text-button" onClick={() => removeRecurring(item.id)}>
+                      삭제
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
           ) : (
             <EmptyState
-              title="템플릿이 없습니다"
-              description="자주 쓰는 지출을 저장해 두면 반복 입력을 줄일 수 있습니다."
+              title="정기지출이 없습니다"
+              description="월세나 구독처럼 반복되는 항목을 등록하면 자동 반영됩니다."
             />
           )}
-
-          <div className="muted">
-            등록된 정기지출: {recurringExpenses.length}개
-          </div>
         </section>
       </div>
     </section>

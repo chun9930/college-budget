@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import EmptyState from '../components/EmptyState';
-import SummaryCard from '../components/SummaryCard';
+import MetricStrip from '../components/MetricStrip';
 
 function getMonthKey(date) {
   const current = new Date(date);
@@ -48,23 +48,25 @@ export default function Statistics({ expenseRecords }) {
         </div>
       </div>
 
-      <div className="grid-3">
-        <SummaryCard
-          title="월 지출 요약"
-          value={`${Math.round(summary.monthlyTotal).toLocaleString()}원`}
-          note={`${summary.currentMonthRecords.length}건 기록`}
-        />
-        <SummaryCard
-          title="가장 많이 쓴 항목"
-          value={summary.topCategory[0]}
-          note={`${Math.round(summary.topCategory[1]).toLocaleString()}원`}
-        />
-        <SummaryCard
-          title="절약 우선 항목"
-          value={summary.warningCategories.length > 0 ? summary.warningCategories[0][0] : '없음'}
-          note="비중이 큰 카테고리"
-        />
-      </div>
+      <MetricStrip
+        items={[
+          {
+            title: '월 지출 요약',
+            value: `${Math.round(summary.monthlyTotal).toLocaleString()}원`,
+            note: `${summary.currentMonthRecords.length}건 기록`,
+          },
+          {
+            title: '가장 많이 쓴 항목',
+            value: summary.topCategory[0],
+            note: `${Math.round(summary.topCategory[1]).toLocaleString()}원`,
+          },
+          {
+            title: '절약 우선 항목',
+            value: summary.warningCategories.length > 0 ? summary.warningCategories[0][0] : '없음',
+            note: '비중이 큰 카테고리',
+          },
+        ]}
+      />
 
       <div className="grid-2">
         <section className="card stack">

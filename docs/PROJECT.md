@@ -220,8 +220,14 @@ MVP 입력:
 고급 옵션:
 - 지출 유형
 - 메모
-- 템플릿 저장 / 불러오기
+- 최근 기록 10개로 빠른 입력
+- 일반 지출 수정
+- 일반 지출 삭제
+- 지출 기록 수정 중 표시
 - 정기지출 등록
+- 정기지출 수정
+- 정기지출 삭제
+- 수정 중에는 현재 항목 이름과 금액을 표시한다
 
 ### 7.4 분석
 
@@ -305,7 +311,6 @@ MVP 입력:
 - `monthlyIncome`
 - `budgetSettings`
 - `expenseRecords`
-- `expenseTemplates`
 - `alertState`
 - `recurringExpenses`
 - `loginState`

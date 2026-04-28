@@ -36,6 +36,18 @@ describe('college budget app', () => {
     expect(screen.getByRole('heading', { name: '로그인' })).toBeInTheDocument();
   });
 
+  it('renders calendar route', () => {
+    window.location.hash = '#/calendar';
+
+    render(
+      <HashRouter>
+        <App />
+      </HashRouter>
+    );
+
+    expect(screen.getByRole('heading', { name: '캘린더' })).toBeInTheDocument();
+  });
+
   it('calculates daily budget with manual priority', () => {
     expect(
       calculateDailyBudget({

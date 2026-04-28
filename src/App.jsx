@@ -4,6 +4,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import BottomNav from './components/BottomNav';
 import Header from './components/Header';
 import BudgetSettings from './pages/BudgetSettings';
+import Calendar from './pages/Calendar';
 import ExpenseRecords from './pages/ExpenseRecords';
 import Home from './pages/Home';
 import Login from './pages/Login';
@@ -57,6 +58,17 @@ function isSameMonth(left, right) {
   return left.getFullYear() === right.getFullYear() && left.getMonth() === right.getMonth();
 }
 
+function getDateKey(date = new Date()) {
+  const current = new Date(date);
+  return `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}-${String(
+    current.getDate()
+  ).padStart(2, '0')}`;
+}
+
+function buildDateTimeFromDateKey(dateKey) {
+  return `${dateKey}T00:00:00`;
+}
+
 function createExpenseRecord(record) {
   return {
     id: crypto.randomUUID(),
@@ -88,12 +100,10 @@ export default function App() {
     loadJSON(KEYS.savingGoalSettings, DEFAULT_SAVING_GOAL_SETTINGS)
   );
   const [expenseRecords, setExpenseRecords] = useState(() => loadJSON(KEYS.expenseRecords, []));
-  const [expenseTemplates, setExpenseTemplates] = useState(() =>
-    loadJSON(KEYS.expenseTemplates, [])
-  );
   const [recurringExpenses, setRecurringExpenses] = useState(() =>
     loadJSON(KEYS.recurringExpenses, [])
   );
+  const [expenseDraftDateKey, setExpenseDraftDateKey] = useState(() => getDateKey(today));
   const [alertStateState, setAlertStateState] = useState(() =>
     loadJSON(KEYS.alertState, DEFAULT_ALERT_STATE)
   );
@@ -115,10 +125,6 @@ export default function App() {
   useEffect(() => {
     saveJSON(KEYS.expenseRecords, expenseRecords);
   }, [expenseRecords]);
-
-  useEffect(() => {
-    saveJSON(KEYS.expenseTemplates, expenseTemplates);
-  }, [expenseTemplates]);
 
   useEffect(() => {
     saveJSON(KEYS.recurringExpenses, recurringExpenses);
@@ -252,24 +258,31 @@ export default function App() {
     setBudgetSettings(DEFAULT_BUDGET_SETTINGS);
     setSavingGoalSettings(DEFAULT_SAVING_GOAL_SETTINGS);
     setExpenseRecords([]);
-    setExpenseTemplates([]);
     setRecurringExpenses([]);
+    setExpenseDraftDateKey(getDateKey(today));
     setAlertStateState(DEFAULT_ALERT_STATE);
     setLoginState(null);
     setUserProfile(null);
   };
 
   const addExpenseRecord = (record) => {
-    setExpenseRecords((current) => [createExpenseRecord(record), ...current]);
+    const nextRecord = {
+      ...record,
+      date: record.date || buildDateTimeFromDateKey(expenseDraftDateKey),
+    };
+
+    setExpenseRecords((current) => [createExpenseRecord(nextRecord), ...current]);
     setAlertStateState((current) => ({ ...current, dismissed: false }));
   };
 
-  const addExpenseTemplate = (template) => {
-    setExpenseTemplates((current) => [template, ...current]);
+  const updateExpenseRecord = (expenseId, nextRecord) => {
+    setExpenseRecords((current) =>
+      current.map((item) => (item.id === expenseId ? { ...item, ...nextRecord, id: item.id } : item))
+    );
   };
 
-  const removeExpenseTemplate = (templateId) => {
-    setExpenseTemplates((current) => current.filter((template) => template.id !== templateId));
+  const deleteExpenseRecord = (expenseId) => {
+    setExpenseRecords((current) => current.filter((item) => item.id !== expenseId));
   };
 
   const addRecurringExpense = (record) => {
@@ -280,6 +293,16 @@ export default function App() {
       },
       ...current,
     ]);
+  };
+
+  const updateRecurringExpense = (recurringId, nextRecord) => {
+    setRecurringExpenses((current) =>
+      current.map((item) => (item.id === recurringId ? { ...item, ...nextRecord } : item))
+    );
+  };
+
+  const deleteRecurringExpense = (recurringId) => {
+    setRecurringExpenses((current) => current.filter((item) => item.id !== recurringId));
   };
 
   const updateBudgetSettings = ({ monthlyIncome: nextMonthlyIncome, budgetSettings: nextBudgetSettings, savingGoalSettings: nextSavingGoalSettings }) => {
@@ -334,14 +357,20 @@ export default function App() {
             element={
               <ExpenseRecords
                 expenseRecords={expenseRecords}
-                expenseTemplates={expenseTemplates}
                 recurringExpenses={recurringExpenses}
+                selectedDateKey={expenseDraftDateKey}
                 onAddExpenseRecord={addExpenseRecord}
-                onAddExpenseTemplate={addExpenseTemplate}
-                onRemoveExpenseTemplate={removeExpenseTemplate}
+                onUpdateExpenseRecord={updateExpenseRecord}
+                onDeleteExpenseRecord={deleteExpenseRecord}
                 onAddRecurringExpense={addRecurringExpense}
+                onUpdateRecurringExpense={updateRecurringExpense}
+                onDeleteRecurringExpense={deleteRecurringExpense}
               />
             }
+          />
+          <Route
+            path="/calendar"
+            element={<Calendar expenseRecords={expenseRecords} onSelectDate={setExpenseDraftDateKey} />}
           />
           <Route
             path="/statistics"

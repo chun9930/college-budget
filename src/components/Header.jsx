@@ -6,6 +6,7 @@ const NAV_ITEMS = [
   { to: '/budget-settings', label: '예산' },
   { to: '/expense-records', label: '기록' },
   { to: '/statistics', label: '분석' },
+  { to: '/calendar', label: '달력' },
 ];
 
 export default function Header({ currentUser, onLogout }) {

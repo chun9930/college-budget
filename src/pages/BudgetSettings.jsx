@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import FormField from '../components/FormField';
+import MetricStrip from '../components/MetricStrip';
 import PrimaryButton from '../components/PrimaryButton';
-import SummaryCard from '../components/SummaryCard';
 import ToggleRow from '../components/ToggleRow';
 import { calculateGoalSavingPlan } from '../lib/budget';
 
@@ -151,26 +151,28 @@ export default function BudgetSettings({
         </div>
       </div>
 
-      <div className="grid-3">
-        <SummaryCard
-          title="오늘 예산 미리보기"
-          value={`${Math.round(dailyBudget).toLocaleString()}원`}
-          note={`남은 일수 ${remainingDays}일`}
-        />
-        <SummaryCard
-          title="월 수입"
-          value={`${toDisplayNumber(formState.monthlyIncome)}원`}
-          note="자동 계산의 기준값"
-        />
-        <SummaryCard
-          title="목표 저축"
-          value={`${toDisplayNumber(goalPlan.remainingAmount)}원`}
-          note="현재 저축을 뺀 남은 목표 금액"
-        />
-      </div>
+      <MetricStrip
+        items={[
+          {
+            title: '오늘 예산 미리보기',
+            value: `${Math.round(dailyBudget).toLocaleString()}원`,
+            note: `남은 일수 ${remainingDays}일`,
+          },
+          {
+            title: '월 수입',
+            value: `${toDisplayNumber(formState.monthlyIncome)}원`,
+            note: '자동 계산의 기준값',
+          },
+          {
+            title: '목표 저축',
+            value: `${toDisplayNumber(goalPlan.remainingAmount)}원`,
+            note: '현재 저축을 뺀 남은 목표 금액',
+          },
+        ]}
+      />
 
-      <form className="grid-2" onSubmit={handleSubmit}>
-        <section className="card stack">
+      <form className="budget-layout" onSubmit={handleSubmit}>
+        <section className="card stack budget-main">
           <h2 className="section-title">기본 예산 카드</h2>
 
           <FormField id="monthlyIncome" label="월 수입">
@@ -224,90 +226,93 @@ export default function BudgetSettings({
               disabled={!formState.carryOverEnabled}
             />
           </FormField>
+
+          <div className="budget-divider" aria-hidden="true" />
+
+          <div className="budget-section stack">
+            <h2 className="section-title">기능 토글 카드</h2>
+
+            <div className="toggle-list">
+              {TOGGLE_FIELDS.map((item) => (
+                <ToggleRow
+                  key={item.key}
+                  id={item.key}
+                  label={item.label}
+                  checked={Boolean(formState[item.key])}
+                  onChange={handleToggleChange(item.key)}
+                />
+              ))}
+            </div>
+
+            <div className="toggle-state-panel">
+              <h3 className="section-title">기능 상태</h3>
+              <p className="muted">
+                목표 설정, 기간별 계산, 이월 기능은 ON/OFF 상태를 저장하고 마이페이지에서 확인합니다.
+              </p>
+            </div>
+          </div>
         </section>
 
-        <section className="card toggle-card">
-          <h2 className="section-title">기능 토글 카드</h2>
+        <div className="budget-side stack">
+          {formState.goalEnabled ? (
+            <section className="card stack">
+              <h2 className="section-title">목표 설정 카드</h2>
 
-          <div className="toggle-list">
-            {TOGGLE_FIELDS.map((item) => (
-              <ToggleRow
-                key={item.key}
-                id={item.key}
-                label={item.label}
-                checked={Boolean(formState[item.key])}
-                onChange={handleToggleChange(item.key)}
-              />
-            ))}
-          </div>
+              <FormField id="goalAmount" label="목표 금액">
+                <input
+                  id="goalAmount"
+                  type="number"
+                  inputMode="numeric"
+                  value={formState.goalAmount}
+                  onChange={updateField('goalAmount')}
+                />
+              </FormField>
 
-          <div className="toggle-state-panel">
-            <h3 className="section-title">기능 상태</h3>
-            <p className="muted">
-              목표 설정, 기간별 계산, 이월 기능은 ON/OFF 상태를 저장하고 마이페이지에서 확인합니다.
-            </p>
-          </div>
-        </section>
+              <FormField id="goalPeriod" label="목표 기간(일)">
+                <input
+                  id="goalPeriod"
+                  type="number"
+                  inputMode="numeric"
+                  value={formState.goalPeriod}
+                  onChange={updateField('goalPeriod')}
+                />
+              </FormField>
 
-        {formState.goalEnabled ? (
-          <section className="card stack">
-            <h2 className="section-title">목표 설정 카드</h2>
+              <FormField id="currentSaving" label="현재 저축 금액">
+                <input
+                  id="currentSaving"
+                  type="number"
+                  inputMode="numeric"
+                  value={formState.currentSaving}
+                  onChange={updateField('currentSaving')}
+                />
+              </FormField>
+            </section>
+          ) : null}
 
-            <FormField id="goalAmount" label="목표 금액">
-              <input
-                id="goalAmount"
-                type="number"
-                inputMode="numeric"
-                value={formState.goalAmount}
-                onChange={updateField('goalAmount')}
-              />
-            </FormField>
+          {formState.periodCalculationEnabled ? (
+            <section className="card stack">
+              <h2 className="section-title">기간별 계산 카드</h2>
 
-            <FormField id="goalPeriod" label="목표 기간(일)">
-              <input
-                id="goalPeriod"
-                type="number"
-                inputMode="numeric"
-                value={formState.goalPeriod}
-                onChange={updateField('goalPeriod')}
-              />
-            </FormField>
+              <div className="budget-inline-stats">
+                <div className="budget-inline-stat">
+                  <span className="muted">하루 필요 저축 금액</span>
+                  <strong>{Math.round(goalPlan.dailyNeed).toLocaleString()}원</strong>
+                </div>
+                <div className="budget-inline-stat">
+                  <span className="muted">주간 필요 저축 금액</span>
+                  <strong>{Math.round(goalPlan.weeklyNeed).toLocaleString()}원</strong>
+                </div>
+                <div className="budget-inline-stat">
+                  <span className="muted">월 필요 저축 금액</span>
+                  <strong>{Math.round(goalPlan.monthlyNeed).toLocaleString()}원</strong>
+                </div>
+              </div>
+            </section>
+          ) : null}
+        </div>
 
-            <FormField id="currentSaving" label="현재 저축 금액">
-              <input
-                id="currentSaving"
-                type="number"
-                inputMode="numeric"
-                value={formState.currentSaving}
-                onChange={updateField('currentSaving')}
-              />
-            </FormField>
-          </section>
-        ) : null}
-
-        {formState.periodCalculationEnabled ? (
-          <section className="card stack">
-            <h2 className="section-title">기간별 계산 카드</h2>
-
-            <SummaryCard
-              title="하루 필요 저축 금액"
-              value={`${Math.round(goalPlan.dailyNeed).toLocaleString()}원`}
-              note="목표 금액을 기간으로 나눈 값"
-            />
-            <SummaryCard
-              title="주간 필요 저축 금액"
-              value={`${Math.round(goalPlan.weeklyNeed).toLocaleString()}원`}
-              note="하루 필요 저축 금액 × 7"
-            />
-            <SummaryCard
-              title="월 필요 저축 금액"
-              value={`${Math.round(goalPlan.monthlyNeed).toLocaleString()}원`}
-              note="하루 필요 저축 금액 × 30"
-            />
-          </section>
-        ) : null}
-
-        <div className="form-actions">
+        <div className="form-actions budget-actions">
           <PrimaryButton type="submit">저장하기</PrimaryButton>
         </div>
       </form>

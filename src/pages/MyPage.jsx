@@ -79,7 +79,7 @@ export default function MyPage({
             <article className="card stack">
               <h2 className="section-title">계정 관리</h2>
               <p className="muted">
-                데이터 초기화는 저장된 예산, 지출 기록, 템플릿, 로그인 상태를 모두 초기화합니다.
+                데이터 초기화는 저장된 예산, 지출 기록, 로그인 상태를 모두 초기화합니다.
               </p>
               <div className="form-actions">
                 <PrimaryButton onClick={handleReset} variant="ghost">

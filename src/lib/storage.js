@@ -4,7 +4,6 @@ export const KEYS = {
   savingGoalSettings: 'savingGoalSettings',
   alertState: 'alertState',
   expenseRecords: 'expenseRecords',
-  expenseTemplates: 'expenseTemplates',
   recurringExpenses: 'recurringExpenses',
   loginState: 'loginState',
   userProfile: 'userProfile',
