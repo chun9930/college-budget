@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import FormField from '../components/FormField';
 import PrimaryButton from '../components/PrimaryButton';
 import SummaryCard from '../components/SummaryCard';
+import ToggleRow from '../components/ToggleRow';
 import { calculateGoalSavingPlan } from '../lib/budget';
 
 const DEFAULT_FORM = {
@@ -19,6 +20,13 @@ const DEFAULT_FORM = {
   currentSaving: '',
 };
 
+const TOGGLE_FIELDS = [
+  { key: 'useManualBudget', label: '수동 하루 예산 사용' },
+  { key: 'goalEnabled', label: '목표 설정' },
+  { key: 'periodCalculationEnabled', label: '기간별 저축 계산' },
+  { key: 'carryOverEnabled', label: '이월 기능' },
+];
+
 function toDisplayNumber(value) {
   const parsed = Number(value || 0);
   return Number.isFinite(parsed) ? parsed.toLocaleString() : '0';
@@ -31,25 +39,47 @@ export default function BudgetSettings({
   dailyBudget,
   remainingDays,
   onSave,
+  onToggleChange,
 }) {
   const [formState, setFormState] = useState(DEFAULT_FORM);
 
   useEffect(() => {
-    setFormState({
+    setFormState((current) => ({
+      ...current,
       monthlyIncome: String(monthlyIncome || ''),
-      useManualBudget: Boolean(budgetSettings.useManualBudget),
       manualDailyBudget: String(budgetSettings.manualDailyBudget || ''),
       fixedExpenseAmount: String(budgetSettings.fixedExpenseAmount || ''),
       emergencyFundAmount: String(budgetSettings.emergencyFundAmount || ''),
-      goalEnabled: Boolean(budgetSettings.goalEnabled),
-      periodCalculationEnabled: Boolean(budgetSettings.periodCalculationEnabled),
-      carryOverEnabled: Boolean(budgetSettings.carryOverEnabled),
       carryOverAmount: String(budgetSettings.carryOverAmount || ''),
       goalAmount: String(savingGoalSettings.goalAmount || ''),
       goalPeriod: String(savingGoalSettings.goalPeriod || ''),
       currentSaving: String(savingGoalSettings.currentSaving || ''),
-    });
-  }, [budgetSettings, monthlyIncome, savingGoalSettings]);
+    }));
+  }, [
+    budgetSettings.carryOverAmount,
+    budgetSettings.emergencyFundAmount,
+    budgetSettings.fixedExpenseAmount,
+    budgetSettings.manualDailyBudget,
+    monthlyIncome,
+    savingGoalSettings.currentSaving,
+    savingGoalSettings.goalAmount,
+    savingGoalSettings.goalPeriod,
+  ]);
+
+  useEffect(() => {
+    setFormState((current) => ({
+      ...current,
+      useManualBudget: Boolean(budgetSettings.useManualBudget),
+      goalEnabled: Boolean(budgetSettings.goalEnabled),
+      periodCalculationEnabled: Boolean(budgetSettings.periodCalculationEnabled),
+      carryOverEnabled: Boolean(budgetSettings.carryOverEnabled),
+    }));
+  }, [
+    budgetSettings.carryOverEnabled,
+    budgetSettings.goalEnabled,
+    budgetSettings.periodCalculationEnabled,
+    budgetSettings.useManualBudget,
+  ]);
 
   const goalPlan = useMemo(
     () =>
@@ -96,6 +126,18 @@ export default function BudgetSettings({
       ...current,
       [field]: value,
     }));
+  };
+
+  const handleToggleChange = (field) => (event) => {
+    const checked = event.target.checked;
+    setFormState((current) => ({
+      ...current,
+      [field]: checked,
+    }));
+
+    if (onToggleChange) {
+      onToggleChange(field, checked);
+    }
   };
 
   return (
@@ -184,46 +226,22 @@ export default function BudgetSettings({
           </FormField>
         </section>
 
-        <section className="card stack">
+        <section className="card toggle-card">
           <h2 className="section-title">기능 토글 카드</h2>
 
-          <FormField id="useManualBudget" label="수동 하루 예산 사용">
-            <input
-              id="useManualBudget"
-              type="checkbox"
-              checked={formState.useManualBudget}
-              onChange={updateField('useManualBudget')}
-            />
-          </FormField>
+          <div className="toggle-list">
+            {TOGGLE_FIELDS.map((item) => (
+              <ToggleRow
+                key={item.key}
+                id={item.key}
+                label={item.label}
+                checked={Boolean(formState[item.key])}
+                onChange={handleToggleChange(item.key)}
+              />
+            ))}
+          </div>
 
-          <FormField id="goalEnabled" label="목표 설정">
-            <input
-              id="goalEnabled"
-              type="checkbox"
-              checked={formState.goalEnabled}
-              onChange={updateField('goalEnabled')}
-            />
-          </FormField>
-
-          <FormField id="periodCalculationEnabled" label="기간별 저축 계산">
-            <input
-              id="periodCalculationEnabled"
-              type="checkbox"
-              checked={formState.periodCalculationEnabled}
-              onChange={updateField('periodCalculationEnabled')}
-            />
-          </FormField>
-
-          <FormField id="carryOverEnabled" label="이월 기능">
-            <input
-              id="carryOverEnabled"
-              type="checkbox"
-              checked={formState.carryOverEnabled}
-              onChange={updateField('carryOverEnabled')}
-            />
-          </FormField>
-
-          <div className="card stack">
+          <div className="toggle-state-panel">
             <h3 className="section-title">기능 상태</h3>
             <p className="muted">
               목표 설정, 기간별 계산, 이월 기능은 ON/OFF 상태를 저장하고 마이페이지에서 확인합니다.

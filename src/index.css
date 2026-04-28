@@ -84,8 +84,8 @@ button {
 }
 
 .brand-mark {
-  width: 160px;
-  height: 40px;
+  width: 240px;
+  height: 72px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -366,6 +366,92 @@ button {
   gap: 12px;
 }
 
+.toggle-card {
+  display: grid;
+  gap: 16px;
+}
+
+.toggle-list {
+  display: grid;
+  gap: 12px;
+}
+
+.toggle-row {
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.toggle-row__label {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.toggle-switch {
+  position: relative;
+  width: 76px;
+  height: 40px;
+  flex: 0 0 auto;
+}
+
+.toggle-switch input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.toggle-switch__track {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: #d1d5db;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  transition: background 0.2s ease, border-color 0.2s ease;
+  box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.08);
+}
+
+.toggle-switch__thumb {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 4px 10px rgba(15, 23, 42, 0.16);
+  transition: transform 0.2s ease;
+}
+
+.toggle-switch input:checked + .toggle-switch__track {
+  background: linear-gradient(135deg, var(--brand) 0%, #4f8df7 100%);
+  border-color: rgba(31, 111, 235, 0.35);
+}
+
+.toggle-switch input:checked + .toggle-switch__track .toggle-switch__thumb {
+  transform: translateX(36px);
+}
+
+.toggle-switch input:focus-visible + .toggle-switch__track {
+  outline: 3px solid rgba(31, 111, 235, 0.24);
+  outline-offset: 2px;
+}
+
+.toggle-state-panel {
+  padding: 18px;
+  border-radius: 18px;
+  border: 1px solid rgba(31, 111, 235, 0.16);
+  background: #f8fbff;
+}
+
+.toggle-state-panel .section-title {
+  margin-bottom: 10px;
+}
+
 .muted {
   color: var(--muted);
 }
@@ -438,6 +524,11 @@ button {
   .app-header {
     border-radius: 18px;
   }
+
+  .brand-mark {
+    width: 180px;
+    height: 54px;
+  }
 }
 
 @media (max-width: 720px) {
@@ -481,6 +572,29 @@ button {
 
   .app-main {
     padding-bottom: 126px;
+  }
+
+  .brand-mark {
+    width: 150px;
+    height: 48px;
+  }
+
+  .toggle-row {
+    align-items: flex-start;
+  }
+
+  .toggle-switch {
+    width: 72px;
+    height: 38px;
+  }
+
+  .toggle-switch__thumb {
+    width: 28px;
+    height: 28px;
+  }
+
+  .toggle-switch input:checked + .toggle-switch__track .toggle-switch__thumb {
+    transform: translateX(34px);
   }
 }
 

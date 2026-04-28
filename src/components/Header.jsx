@@ -16,7 +16,7 @@ export default function Header({ currentUser, onLogout }) {
           <img src="/logo.svg" alt="" />
         </span>
         <span className="brand-copy">
-          <strong>College Budget</strong>
+          <strong>Pingo</strong>
           <span>소비 판단 도구</span>
         </span>
       </Link>

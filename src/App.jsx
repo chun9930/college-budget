@@ -288,6 +288,13 @@ export default function App() {
     setSavingGoalSettings(nextSavingGoalSettings);
   };
 
+  const updateBudgetSettingsField = (field, value) => {
+    setBudgetSettings((current) => ({
+      ...current,
+      [field]: value,
+    }));
+  };
+
   const dismissAlert = () => {
     setAlertStateState((current) => ({ ...current, dismissed: true }));
   };
@@ -318,6 +325,7 @@ export default function App() {
                 dailyBudget={dailyBudget}
                 remainingDays={remainingDays}
                 onSave={updateBudgetSettings}
+                onToggleChange={updateBudgetSettingsField}
               />
             }
           />
