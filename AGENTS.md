@@ -233,6 +233,17 @@ Rules:
   * test:
 * Keep commits small and meaningful.
 * DO NOT create vague commits such as "update", "change", or "fix stuff".
+* 커밋은 사용자의 명시적 허락을 받은 뒤에만 진행한다.
+* 커밋을 진행하기 전에는 반드시 한국어로 커밋 메시지 초안을 먼저 보여주고 승인을 받는다.
+* 사용자가 승인하지 않으면 커밋하지 않는다.
+* 커밋 메시지 예시는 한국어로 함께 제시한다.
+
+예시:
+
+* `feat: 로그인 mock auth 추가`
+* `fix: 예산 계산식 남은 일수 처리 수정`
+* `docs: 프로젝트 기준 문서 정리`
+* `test: 회원가입 중복 검사 추가`
 
 #### Remote Push
 
@@ -241,7 +252,10 @@ Rules:
 * Use `https://github.com/chun9930/college-budget.git` as the default GitHub remote destination for future pushes.
 * For every meaningful completed change, create a clear Conventional Commit message and push it to GitHub.
 * Prefer isolated feature branches or worktrees for non-trivial tasks so rollback and recovery stay easy.
-* If a push, overwrite, or recovery action needs user approval, ask for that approval in Korean.
+* 푸시는 커밋 완료 후에만 진행한다.
+* 푸시 전에 반드시 사용자 승인을 받는다.
+* 푸시 승인 요청은 한국어로 하고, 푸시 대상 브랜치와 커밋 메시지를 함께 안내한다.
+* 오버라이트, 복구, 강제 푸시가 필요한 경우에는 반드시 사용자 승인을 먼저 받는다.
 
 ---
 

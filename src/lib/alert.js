@@ -11,8 +11,8 @@ export function getAlertState({ spent = 0, dailyBudget = 0 } = {}) {
 
   if (!Number.isFinite(budget) || budget <= 0) {
     return used > 0
-      ? { key: 'over', label: ALERT_LABELS.over, description: '예산을 계산할 수 없습니다.' }
-      : { key: 'safe', label: ALERT_LABELS.safe, description: '예산이 준비되었습니다.' };
+      ? { key: 'over', label: ALERT_LABELS.over, description: '예산이 없어 초과 상태로 봅니다.' }
+      : { key: 'safe', label: ALERT_LABELS.safe, description: '예산을 입력하면 상태를 계산합니다.' };
   }
 
   const usageRate = used / budget;
@@ -44,7 +44,6 @@ export function getAlertState({ spent = 0, dailyBudget = 0 } = {}) {
   return {
     key: 'safe',
     label: ALERT_LABELS.safe,
-    description: '예산이 안정적입니다.',
+    description: '예산이 아직 여유롭습니다.',
   };
 }
-

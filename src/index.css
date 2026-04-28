@@ -122,6 +122,14 @@ button {
   flex-wrap: wrap;
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 .nav-link {
   padding: 10px 14px;
   border-radius: 999px;
@@ -129,9 +137,19 @@ button {
   font-weight: 600;
 }
 
+.button-link {
+  background: transparent;
+  border: 0;
+}
+
 .nav-link.active {
   background: var(--brand-soft);
   color: var(--brand);
+}
+
+.narrow {
+  width: min(720px, 100%);
+  margin: 0 auto;
 }
 
 .page-stack {
@@ -333,6 +351,16 @@ button {
   gap: 12px;
 }
 
+.text-button {
+  min-height: 48px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--brand);
+  font-weight: 700;
+  text-align: left;
+}
+
 .stack {
   display: grid;
   gap: 12px;
@@ -340,6 +368,19 @@ button {
 
 .muted {
   color: var(--muted);
+}
+
+.error-text {
+  margin: 0;
+  color: var(--danger);
+  font-weight: 700;
+}
+
+.plain-list {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 8px;
 }
 
 .list {

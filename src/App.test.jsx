@@ -1,14 +1,16 @@
+import React from 'react';
 import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { HashRouter } from 'react-router-dom';
 import App from './App';
-import { calculateDailyBudget, getRemainingDaysIncludingToday } from './lib/budget';
+import { calculateDailyBudget, calculateGoalSavingPlan, getRemainingDaysIncludingToday } from './lib/budget';
 import { getAlertState } from './lib/alert';
 import { applyRecurringExpenses } from './lib/recurring';
 
 describe('college budget app', () => {
   beforeEach(() => {
     window.localStorage.clear();
+    window.location.hash = '#/';
   });
 
   it('renders home screen', () => {
@@ -18,8 +20,20 @@ describe('college budget app', () => {
       </HashRouter>
     );
 
-    expect(screen.getByRole('heading', { name: '오늘 현황' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '홈' })).toBeInTheDocument();
     expect(screen.getByText('오늘 사용 가능 금액')).toBeInTheDocument();
+  });
+
+  it('renders login route', () => {
+    window.location.hash = '#/login';
+
+    render(
+      <HashRouter>
+        <App />
+      </HashRouter>
+    );
+
+    expect(screen.getByRole('heading', { name: '로그인' })).toBeInTheDocument();
   });
 
   it('calculates daily budget with manual priority', () => {
@@ -38,6 +52,16 @@ describe('college budget app', () => {
 
   it('uses remaining days including today', () => {
     expect(getRemainingDaysIncludingToday(new Date('2026-04-10T12:00:00'))).toBe(21);
+  });
+
+  it('calculates goal saving plan', () => {
+    expect(
+      calculateGoalSavingPlan({
+        goalAmount: 100000,
+        currentSaving: 25000,
+        goalPeriod: 5,
+      }).dailyNeed
+    ).toBe(15000);
   });
 
   it('switches alert state by usage rate', () => {

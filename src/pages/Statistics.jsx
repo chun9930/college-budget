@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import React, { useMemo } from 'react';
 import EmptyState from '../components/EmptyState';
 import SummaryCard from '../components/SummaryCard';
 
@@ -15,7 +15,11 @@ export default function Statistics({ expenseRecords }) {
       (record) => getMonthKey(record.date) === currentMonthKey
     );
 
-    const monthlyTotal = currentMonthRecords.reduce((sum, record) => sum + Number(record.amount || 0), 0);
+    const monthlyTotal = currentMonthRecords.reduce(
+      (sum, record) => sum + Number(record.amount || 0),
+      0
+    );
+
     const categoryMap = currentMonthRecords.reduce((accumulator, record) => {
       const key = record.category || '기타';
       accumulator[key] = (accumulator[key] || 0) + Number(record.amount || 0);
@@ -40,9 +44,7 @@ export default function Statistics({ expenseRecords }) {
       <div className="page-hero">
         <div>
           <h1 className="page-title">분석</h1>
-          <p className="page-subtitle">
-            월별 소비를 카드형 요약과 간단한 비중 그래프로 보여줍니다.
-          </p>
+          <p className="page-subtitle">월 지출 요약과 카테고리 비중만 간단하게 보여 줍니다.</p>
         </div>
       </div>
 
@@ -58,7 +60,7 @@ export default function Statistics({ expenseRecords }) {
           note={`${Math.round(summary.topCategory[1]).toLocaleString()}원`}
         />
         <SummaryCard
-          title="과소비 후보"
+          title="절약 우선 항목"
           value={summary.warningCategories.length > 0 ? summary.warningCategories[0][0] : '없음'}
           note="비중이 큰 카테고리"
         />
@@ -90,7 +92,7 @@ export default function Statistics({ expenseRecords }) {
           ) : (
             <EmptyState
               title="분석할 기록이 없습니다"
-              description="지출을 입력하면 카테고리 비중과 월 요약이 표시됩니다."
+              description="지출을 입력하면 카테고리 비중과 절약 힌트를 볼 수 있습니다."
             />
           )}
         </section>
@@ -112,7 +114,7 @@ export default function Statistics({ expenseRecords }) {
           ) : (
             <EmptyState
               title="절약 힌트가 없습니다"
-              description="기록이 쌓이면 많이 쓴 카테고리부터 절약 후보로 보여줍니다."
+              description="기록이 쌓이면 자주 쓰는 항목을 기준으로 절약 방향을 보여 줍니다."
             />
           )}
         </section>
@@ -120,4 +122,3 @@ export default function Statistics({ expenseRecords }) {
     </section>
   );
 }
-

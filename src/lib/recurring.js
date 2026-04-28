@@ -47,4 +47,3 @@ export function applyRecurringExpenses(records = [], recurringExpenses = [], dat
 
   return nextRecords;
 }
-

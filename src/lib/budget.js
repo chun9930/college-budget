@@ -36,3 +36,22 @@ export function calculateDailyBudget({
 
   return Math.max(0, availableAmount / safeRemainingDays);
 }
+
+export function calculateGoalSavingPlan({
+  goalAmount = '',
+  currentSaving = '',
+  goalPeriod = '',
+} = {}) {
+  const totalGoal = Math.max(0, toNumber(goalAmount));
+  const savedAmount = Math.max(0, toNumber(currentSaving));
+  const remainingAmount = Math.max(0, totalGoal - savedAmount);
+  const safePeriod = Math.max(1, toNumber(goalPeriod));
+  const dailyNeed = remainingAmount / safePeriod;
+
+  return {
+    remainingAmount,
+    dailyNeed,
+    weeklyNeed: dailyNeed * 7,
+    monthlyNeed: dailyNeed * 30,
+  };
+}

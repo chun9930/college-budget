@@ -1,13 +1,17 @@
 export const KEYS = {
   monthlyIncome: 'monthlyIncome',
-  budgetAmount: 'budgetAmount',
   budgetSettings: 'budgetSettings',
+  savingGoalSettings: 'savingGoalSettings',
   alertState: 'alertState',
   expenseRecords: 'expenseRecords',
   expenseTemplates: 'expenseTemplates',
   recurringExpenses: 'recurringExpenses',
   loginState: 'loginState',
+  userProfile: 'userProfile',
+  users: 'users',
 };
+
+const ALL_KEYS = Object.values(KEYS);
 
 export function loadJSON(key, fallbackValue) {
   if (typeof window === 'undefined') {
@@ -31,6 +35,11 @@ export function saveJSON(key, value) {
     return;
   }
 
+  if (value === null || value === undefined) {
+    window.localStorage.removeItem(key);
+    return;
+  }
+
   window.localStorage.setItem(key, JSON.stringify(value));
 }
 
@@ -40,4 +49,12 @@ export function removeJSON(key) {
   }
 
   window.localStorage.removeItem(key);
+}
+
+export function clearAllStorage() {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  ALL_KEYS.forEach((key) => window.localStorage.removeItem(key));
 }

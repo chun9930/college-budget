@@ -1,3 +1,4 @@
+import React from 'react';
 import { Link } from 'react-router-dom';
 import PrimaryButton from '../components/PrimaryButton';
 import StatusBadge from '../components/StatusBadge';
@@ -10,6 +11,7 @@ export default function Home({
   alertDismissed,
   fixedExpenseTotal,
   remainingDays,
+  currentUser,
   onDismissAlert,
 }) {
   const shouldShowBanner = !alertDismissed && alertState.key !== 'safe';
@@ -18,14 +20,25 @@ export default function Home({
     <section className="page-stack">
       <div className="page-hero">
         <div>
-          <h1 className="page-title">오늘 현황</h1>
+          <h1 className="page-title">홈</h1>
           <p className="page-subtitle">
-            오늘 소비 가능 여부를 빠르게 확인하고, 필요한 경우 바로 예산 설정과 지출 입력으로
-            이동합니다.
+            오늘 소비를 해도 되는지 빠르게 판단하고, 필요한 경우 바로 예산 설정으로 이동합니다.
           </p>
         </div>
         <StatusBadge label={alertState.label} tone={alertState.key} />
       </div>
+
+      {currentUser ? (
+        <div className="card stack">
+          <strong>{currentUser.name} 님, 오늘도 예산을 확인해 보세요.</strong>
+          <p className="muted">{currentUser.email}</p>
+        </div>
+      ) : (
+        <div className="card stack">
+          <strong>로그인하지 않아도 홈 화면은 사용할 수 있습니다.</strong>
+          <p className="muted">회원가입과 로그인은 mock auth로 제공됩니다.</p>
+        </div>
+      )}
 
       {shouldShowBanner ? (
         <div className={`alert-banner ${alertState.key}`}>
@@ -55,7 +68,7 @@ export default function Home({
         <SummaryCard
           title="고정지출 요약"
           value={`${Math.round(fixedExpenseTotal).toLocaleString()}원`}
-          note="정기지출 포함 월 고정비"
+          note="고정지출과 정기지출 포함"
         />
       </div>
 
@@ -65,19 +78,19 @@ export default function Home({
           <div className="form-actions">
             <PrimaryButton to="/expense-records">지출 입력</PrimaryButton>
             <PrimaryButton to="/budget-settings" variant="ghost">
-              수입 / 예산 설정
+              예산 설정
             </PrimaryButton>
           </div>
         </article>
 
         <article className="card stack">
-          <h2 className="section-title">요약</h2>
+          <h2 className="section-title">상태 안내</h2>
           <p className="muted">
-            오늘 예산과 비교해 소비 가능 여부를 바로 판단합니다. 필요할 때만 상세 화면으로 이동해
-            기록과 분석을 확인하세요.
+            안전 / 주의 / 위험 / 초과 상태를 텍스트와 색상으로 함께 보여 줍니다. 필요할 때만
+            세부 화면으로 이동하면 됩니다.
           </p>
           <Link className="muted" to="/statistics">
-            월별 분석 보기 →
+            분석 보기
           </Link>
         </article>
       </div>

@@ -1,4 +1,5 @@
-import { NavLink, Link } from 'react-router-dom';
+import React from 'react';
+import { Link, NavLink } from 'react-router-dom';
 
 const NAV_ITEMS = [
   { to: '/', label: '홈' },
@@ -7,7 +8,7 @@ const NAV_ITEMS = [
   { to: '/statistics', label: '분석' },
 ];
 
-export default function Header() {
+export default function Header({ currentUser, onLogout }) {
   return (
     <header className="app-header">
       <Link className="brand" to="/">
@@ -16,7 +17,7 @@ export default function Header() {
         </span>
         <span className="brand-copy">
           <strong>College Budget</strong>
-          <span>대학생 지출 관리</span>
+          <span>소비 판단 도구</span>
         </span>
       </Link>
 
@@ -32,6 +33,28 @@ export default function Header() {
           </NavLink>
         ))}
       </nav>
+
+      <div className="header-actions">
+        {currentUser ? (
+          <>
+            <Link className="nav-link" to="/my-page">
+              {currentUser.name} 님
+            </Link>
+            <button className="nav-link button-link" type="button" onClick={onLogout}>
+              로그아웃
+            </button>
+          </>
+        ) : (
+          <>
+            <Link className="nav-link" to="/login">
+              로그인
+            </Link>
+            <Link className="nav-link" to="/signup">
+              회원가입
+            </Link>
+          </>
+        )}
+      </div>
     </header>
   );
 }

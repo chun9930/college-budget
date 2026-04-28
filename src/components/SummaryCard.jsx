@@ -1,3 +1,4 @@
+import React from 'react';
 export default function SummaryCard({ title, value, note }) {
   return (
     <article className="card summary-card">
