@@ -3,10 +3,14 @@ import EmptyState from '../components/EmptyState';
 import FormField from '../components/FormField';
 import MetricStrip from '../components/MetricStrip';
 import PrimaryButton from '../components/PrimaryButton';
+import {
+  GENERAL_EXPENSE_CATEGORIES,
+  RECURRING_EXPENSE_CATEGORIES,
+} from '../lib/categories';
 
 const DEFAULT_RECORD = {
   amount: '',
-  category: '식비',
+  category: GENERAL_EXPENSE_CATEGORIES[0] || '식비',
   paymentMethod: '카드',
   type: '일반',
   memo: '',
@@ -15,7 +19,7 @@ const DEFAULT_RECORD = {
 const DEFAULT_RECURRING = {
   name: '',
   amount: '',
-  category: '고정지출',
+  category: RECURRING_EXPENSE_CATEGORIES[0] || '주거/공과금',
   paymentDay: '',
   paymentMethod: '카드',
   memo: '',
@@ -56,6 +60,34 @@ function formatSelectedDate(dateKey) {
 
 function buildDateTimeFromDateKey(dateKey) {
   return `${dateKey}T00:00:00`;
+}
+
+function getCategoryOptions(categories, currentValue) {
+  if (!currentValue || categories.includes(currentValue)) {
+    return categories.map((category) => ({
+      value: category,
+      label: category,
+    }));
+  }
+
+  return [
+    {
+      value: currentValue,
+      label: `기존: ${currentValue}`,
+    },
+    ...categories.map((category) => ({
+      value: category,
+      label: category,
+    })),
+  ];
+}
+
+function renderOptions(options) {
+  return options.map((option) => (
+    <option key={option.value} value={option.value}>
+      {option.label}
+    </option>
+  ));
 }
 
 export default function ExpenseRecords({
@@ -169,6 +201,7 @@ export default function ExpenseRecords({
 
   const saveExpense = (event) => {
     event.preventDefault();
+
     if (editingExpenseId) {
       onUpdateExpenseRecord(editingExpenseId, recordForm);
       setLastPaymentMethod(recordForm.paymentMethod || DEFAULT_RECORD.paymentMethod);
@@ -197,6 +230,7 @@ export default function ExpenseRecords({
 
   const saveRecurring = (event) => {
     event.preventDefault();
+
     if (editingRecurringId) {
       onUpdateRecurringExpense(editingRecurringId, recurringForm);
       cancelRecurringEdit();
@@ -214,12 +248,20 @@ export default function ExpenseRecords({
     }
   };
 
+  const generalCategoryOptions = getCategoryOptions(GENERAL_EXPENSE_CATEGORIES, recordForm.category);
+  const recurringCategoryOptions = getCategoryOptions(
+    RECURRING_EXPENSE_CATEGORIES,
+    recurringForm.category
+  );
+
   return (
     <section className="page-stack">
       <div className="page-hero">
         <div>
           <h1 className="page-title">지출 기록</h1>
-          <p className="page-subtitle">MVP 입력은 최소화하고, 최근 기록을 눌러 빠르게 다시 입력할 수 있습니다.</p>
+          <p className="page-subtitle">
+            지출 기록은 최소 입력으로 빠르게 적고, 최근 기록과 정기지출로 다시 입력할 수 있습니다.
+          </p>
         </div>
       </div>
 
@@ -233,24 +275,24 @@ export default function ExpenseRecords({
           {
             title: '이번 달 지출',
             value: `${Math.round(currentMonthTotal).toLocaleString()}원`,
-            note: '월간 소비 합계',
+            note: '월간 지출 합계',
           },
           {
-            title: '빠른 입력',
+            title: '최근 입력',
             value: `${recentRecords.length}개`,
             note: '최근 기록 10개 기준',
           },
           {
             title: '정기지출',
             value: `${recurringExpenses.length}개`,
-            note: '결제일 기준 자동 반영',
+            note: '정기 항목 자동 반영',
           },
         ]}
       />
 
       <div className="grid-2">
         <form className="card form-grid" onSubmit={saveExpense}>
-          <h2 className="section-title">MVP 입력</h2>
+          <h2 className="section-title">지출 기록</h2>
           {editingExpenseId ? (
             <div className="alert-banner">
               <strong>지출 기록 수정 중</strong>
@@ -271,16 +313,8 @@ export default function ExpenseRecords({
           </FormField>
 
           <FormField id="expense-category" label="카테고리">
-            <select
-              id="expense-category"
-              value={recordForm.category}
-              onChange={updateCategoryField}
-            >
-              <option>식비</option>
-              <option>교통</option>
-              <option>쇼핑</option>
-              <option>문화</option>
-              <option>기타</option>
+            <select id="expense-category" value={recordForm.category} onChange={updateCategoryField}>
+              {renderOptions(generalCategoryOptions)}
             </select>
           </FormField>
 
@@ -290,9 +324,9 @@ export default function ExpenseRecords({
               value={recordForm.paymentMethod}
               onChange={updatePaymentMethodField}
             >
-              <option>카드</option>
-              <option>현금</option>
-              <option>이체</option>
+              <option value="카드">카드</option>
+              <option value="현금">현금</option>
+              <option value="이체">이체</option>
             </select>
           </FormField>
 
@@ -310,9 +344,9 @@ export default function ExpenseRecords({
 
               <FormField id="expense-type" label="지출 유형">
                 <select id="expense-type" value={recordForm.type} onChange={updateRecordField('type')}>
-                  <option>일반</option>
-                  <option>고정</option>
-                  <option>정기</option>
+                  <option value="일반">일반</option>
+                  <option value="고정">고정</option>
+                  <option value="정기">정기</option>
                 </select>
               </FormField>
 
@@ -341,7 +375,7 @@ export default function ExpenseRecords({
         </form>
 
         <form className="card form-grid" onSubmit={saveRecurring}>
-          <h2 className="section-title">정기지출 등록</h2>
+          <h2 className="section-title">정기지출 관리</h2>
           {editingRecurringId ? (
             <div className="alert-banner">
               <strong>정기지출 수정 중</strong>
@@ -407,10 +441,7 @@ export default function ExpenseRecords({
                 }))
               }
             >
-              <option>고정지출</option>
-              <option>식비</option>
-              <option>교통</option>
-              <option>구독</option>
+              {renderOptions(recurringCategoryOptions)}
             </select>
           </FormField>
 
@@ -425,9 +456,9 @@ export default function ExpenseRecords({
                 }))
               }
             >
-              <option>카드</option>
-              <option>현금</option>
-              <option>이체</option>
+              <option value="카드">카드</option>
+              <option value="현금">현금</option>
+              <option value="이체">이체</option>
             </select>
           </FormField>
 
@@ -519,7 +550,7 @@ export default function ExpenseRecords({
           ) : (
             <EmptyState
               title="기록이 없습니다"
-              description="첫 지출을 저장하면 최근 기록으로 빠른 입력 영역이 여기에 표시됩니다."
+              description="첫 지출을 저장하면 최근 기록으로 빠른 입력 영역이 생깁니다."
             />
           )}
         </section>
@@ -533,7 +564,8 @@ export default function ExpenseRecords({
                   <div>
                     <strong>{item.name}</strong>
                     <div className="muted">
-                      {Number(item.amount || 0).toLocaleString()}원 · 매월 {item.paymentDay}일 · {item.paymentMethod}
+                      {Number(item.amount || 0).toLocaleString()}원 · 매월 {item.paymentDay}일 ·{' '}
+                      {item.paymentMethod}
                     </div>
                     <div className="muted">{item.category}</div>
                   </div>
@@ -551,7 +583,7 @@ export default function ExpenseRecords({
           ) : (
             <EmptyState
               title="정기지출이 없습니다"
-              description="월세나 구독처럼 반복되는 항목을 등록하면 자동 반영됩니다."
+              description="주거비, 통신, 구독 같은 반복 항목을 등록하면 자동 반영됩니다."
             />
           )}
         </section>
