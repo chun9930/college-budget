@@ -1,0 +1,6 @@
+<svg width="160" height="40" viewBox="0 0 160 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect x="1" y="1" width="38" height="38" rx="10" fill="#1F6FEB" />
+  <path d="M11 26V14H15.2L19 20.2L22.8 14H27V26H23.8V19L19 26.2L14.2 19V26H11Z" fill="white" />
+  <text x="48" y="25" font-size="16" font-family="Arial, sans-serif" fill="#0F172A">College Budget</text>
+</svg>
+

@@ -1,0 +1,24 @@
+{
+  "name": "college-budget-web",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "set NODE_OPTIONS=--preserve-symlinks&& vite",
+    "build": "set NODE_OPTIONS=--preserve-symlinks&& vite build",
+    "test": "set NODE_OPTIONS=--preserve-symlinks&& vitest run --environment jsdom --pool threads"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.26.2"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.5.0",
+    "@testing-library/react": "^16.0.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "jsdom": "^25.0.1",
+    "vite": "^5.4.2",
+    "vitest": "^2.1.8"
+  }
+}
