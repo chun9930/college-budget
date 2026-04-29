@@ -2,13 +2,24 @@ import React from 'react';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { describe, expect, it, vi } from 'vitest';
+import { MemoryRouter } from 'react-router-dom';
 import ExpenseRecords from './ExpenseRecords';
+import { GENERAL_EXPENSE_CATEGORIES, RECURRING_EXPENSE_CATEGORIES } from '../lib/categories';
+
+function renderExpenseRecords(ui, initialEntries = ['/expense-records']) {
+  return render(<MemoryRouter initialEntries={initialEntries}>{ui}</MemoryRouter>);
+}
+
+function openRecurringPage() {
+  fireEvent.click(screen.getByRole('tab', { name: '정기지출 관리' }));
+  return screen.getByRole('heading', { name: '정기지출 관리' }).closest('section');
+}
 
 function createRecord(index, overrides = {}) {
   return {
     id: `record-${index}`,
     amount: 1000 * (index + 1),
-    category: index === 0 ? '식비' : index % 2 === 0 ? '교통' : '쇼핑',
+    category: index === 0 ? GENERAL_EXPENSE_CATEGORIES[0] : index % 2 === 0 ? '교통' : '쇼핑',
     paymentMethod: index === 0 ? '카드' : index % 2 === 0 ? '현금' : '이체',
     type: '일반',
     memo: '',
@@ -25,7 +36,7 @@ describe('ExpenseRecords', () => {
         id: 'recurring-1',
         name: '넷플릭스',
         amount: '17000',
-        category: '주거/공과금',
+        category: RECURRING_EXPENSE_CATEGORIES[3],
         paymentDay: '5',
         paymentMethod: '카드',
         memo: '가족 공유 요금',
@@ -37,221 +48,273 @@ describe('ExpenseRecords', () => {
     onDeleteExpenseRecord: vi.fn(),
     onUpdateRecurringExpense: vi.fn(),
     onDeleteRecurringExpense: vi.fn(),
+    showToast: vi.fn(),
+    dailyBudget: 50000,
+    todaySpent: 12000,
+    selectedDateKey: '2026-04-28',
   };
 
   it('shows 10 recent records in quick input', () => {
-    render(<ExpenseRecords {...baseProps} />);
+    renderExpenseRecords(<ExpenseRecords {...baseProps} />);
 
     const section = screen.getByRole('heading', { name: '최근 기록으로 빠른 입력' }).closest('section');
     expect(section).toBeInTheDocument();
     expect(within(section).getAllByRole('button')).toHaveLength(10);
   });
 
+  it('switches between the general expense and recurring expense internal pages', () => {
+    renderExpenseRecords(<ExpenseRecords {...baseProps} />);
+
+    expect(screen.getByRole('tab', { name: '일반 지출 기록' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('heading', { name: '일반 지출 기록' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '지출 기록' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '일반 지출 기록 목록' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '최근 기록으로 빠른 입력' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: '정기지출 관리' })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('tab', { name: '정기지출 관리' }));
+
+    expect(screen.getByRole('tab', { name: '정기지출 관리' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('heading', { name: '정기지출 관리' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: '일반 지출 기록' })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('tab', { name: '일반 지출 기록' }));
+
+    expect(screen.getByRole('heading', { name: '일반 지출 기록' })).toBeInTheDocument();
+  });
+
   it('fills the form when a recent record is clicked', () => {
-    render(<ExpenseRecords {...baseProps} />);
+    renderExpenseRecords(<ExpenseRecords {...baseProps} />);
 
     const section = screen.getByRole('heading', { name: '최근 기록으로 빠른 입력' }).closest('section');
     fireEvent.click(within(section).getAllByRole('button')[0]);
 
-    expect(screen.getAllByLabelText('금액')[0]).toHaveValue(1000);
-    expect(screen.getAllByLabelText('카테고리')[0]).toHaveValue('식비');
-    expect(screen.getAllByLabelText('결제수단')[0]).toHaveValue('카드');
+    expect(screen.getByLabelText('금액')).toHaveValue('1000');
+
+    const categoryGroup = screen.getByRole('group', { name: '일반 지출 카테고리' });
+    const methodGroup = screen.getByRole('group', { name: '일반 지출 결제수단' });
+
+    expect(within(categoryGroup).getByRole('button', { name: GENERAL_EXPENSE_CATEGORIES[0] })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+    expect(within(methodGroup).getByRole('button', { name: '카드' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
   });
 
-  it('uses the most recent same-category payment method as the category default', () => {
-    render(<ExpenseRecords {...baseProps} />);
-
-    fireEvent.change(screen.getAllByLabelText('카테고리')[0], { target: { value: '교통' } });
-    fireEvent.change(screen.getAllByLabelText('카테고리')[0], { target: { value: '식비' } });
-
-    expect(screen.getAllByLabelText('결제수단')[0]).toHaveValue('카드');
-  });
-
-  it('keeps expense saving working', () => {
+  it('validates the general expense amount field in real time', () => {
     const onAddExpenseRecord = vi.fn();
 
-    render(<ExpenseRecords {...baseProps} onAddExpenseRecord={onAddExpenseRecord} />);
+    renderExpenseRecords(<ExpenseRecords {...baseProps} onAddExpenseRecord={onAddExpenseRecord} />);
 
-    fireEvent.change(screen.getAllByLabelText('금액')[0], { target: { value: '4200' } });
+    const amountInput = screen.getByLabelText('금액');
+    const saveButton = screen.getByRole('button', { name: '지출 저장' });
+
+    expect(saveButton).toBeDisabled();
+
+    fireEvent.change(amountInput, { target: { value: '0' } });
+    expect(screen.getByText('0보다 큰 금액을 입력해주세요')).toBeInTheDocument();
+    expect(saveButton).toBeDisabled();
+
+    fireEvent.change(amountInput, { target: { value: '-1000' } });
+    expect(screen.getByText('0보다 큰 금액을 입력해주세요')).toBeInTheDocument();
+    expect(saveButton).toBeDisabled();
+
+    fireEvent.change(amountInput, { target: { value: 'abc' } });
+    expect(screen.getByText('숫자만 입력할 수 있어요')).toBeInTheDocument();
+    expect(saveButton).toBeDisabled();
+
+    fireEvent.change(amountInput, { target: { value: '4200' } });
+    expect(screen.queryByText('금액을 입력해주세요')).not.toBeInTheDocument();
+    expect(screen.queryByText('0보다 큰 금액을 입력해주세요')).not.toBeInTheDocument();
+    expect(screen.queryByText('숫자만 입력할 수 있어요')).not.toBeInTheDocument();
+    expect(saveButton).not.toBeDisabled();
+
+    fireEvent.click(saveButton);
+    expect(onAddExpenseRecord).toHaveBeenCalledTimes(1);
+  });
+
+  it('validates the recurring expense amount field in real time', () => {
+    const onAddRecurringExpense = vi.fn();
+
+    renderExpenseRecords(
+      <ExpenseRecords {...baseProps} onAddRecurringExpense={onAddRecurringExpense} />
+    );
+
+    const recurringSection = openRecurringPage();
+    const amountInput = within(recurringSection).getByLabelText('금액');
+    const saveButton = within(recurringSection).getByRole('button', { name: '정기지출 저장' });
+
+    expect(saveButton).toBeDisabled();
+
+    fireEvent.change(amountInput, { target: { value: '0' } });
+    expect(screen.getByText('0보다 큰 금액을 입력해주세요')).toBeInTheDocument();
+    expect(saveButton).toBeDisabled();
+
+    fireEvent.change(amountInput, { target: { value: '-1000' } });
+    expect(screen.getByText('0보다 큰 금액을 입력해주세요')).toBeInTheDocument();
+    expect(saveButton).toBeDisabled();
+
+    fireEvent.change(amountInput, { target: { value: 'abc' } });
+    expect(screen.getByText('숫자만 입력할 수 있어요')).toBeInTheDocument();
+    expect(saveButton).toBeDisabled();
+
+    fireEvent.change(amountInput, { target: { value: '17000' } });
+    expect(screen.queryByText('금액을 입력해주세요')).not.toBeInTheDocument();
+    expect(screen.queryByText('0보다 큰 금액을 입력해주세요')).not.toBeInTheDocument();
+    expect(screen.queryByText('숫자만 입력할 수 있어요')).not.toBeInTheDocument();
+    expect(saveButton).not.toBeDisabled();
+
+    fireEvent.click(saveButton);
+    expect(onAddRecurringExpense).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps general expense saving working', () => {
+    const onAddExpenseRecord = vi.fn();
+    const showToast = vi.fn();
+
+    renderExpenseRecords(
+      <ExpenseRecords {...baseProps} onAddExpenseRecord={onAddExpenseRecord} showToast={showToast} />
+    );
+
+    fireEvent.change(screen.getByLabelText('금액'), { target: { value: '4200' } });
     fireEvent.click(screen.getByRole('button', { name: '지출 저장' }));
 
     expect(onAddExpenseRecord).toHaveBeenCalledTimes(1);
     expect(onAddExpenseRecord.mock.calls[0][0]).toMatchObject({
       amount: '4200',
-      category: '식비',
+      category: GENERAL_EXPENSE_CATEGORIES[0],
       paymentMethod: '카드',
+      type: '일반',
       date: '2026-04-28T00:00:00',
     });
+    expect(showToast).toHaveBeenCalledWith('일반 지출이 저장되었습니다');
   });
 
-  it('renders 15 general expense categories and 5 recurring categories', () => {
-    render(<ExpenseRecords {...baseProps} />);
-
-    const generalSelect = screen.getAllByLabelText('카테고리')[0];
-    const recurringSelect = screen.getAllByLabelText('카테고리')[1];
-
-    expect(within(generalSelect).getAllByRole('option')).toHaveLength(15);
-    expect(within(recurringSelect).getAllByRole('option')).toHaveLength(5);
-    expect(within(generalSelect).queryByRole('option', { name: '주거/공과금' })).not.toBeInTheDocument();
-    expect(within(recurringSelect).queryByRole('option', { name: '식비' })).not.toBeInTheDocument();
-  });
-
-  it('shows fallback option for existing category values that are not in the new list', () => {
-    const fallbackProps = {
-      ...baseProps,
-      expenseRecords: [createRecord(0, { category: '과거카테고리', paymentMethod: '현금' })],
-    };
-
-    render(<ExpenseRecords {...fallbackProps} />);
-
-    const section = screen.getByRole('heading', { name: '최근 기록으로 빠른 입력' }).closest('section');
-    fireEvent.click(within(section).getAllByRole('button')[0]);
-
-    expect(screen.getAllByLabelText('카테고리')[0]).toHaveValue('과거카테고리');
-    expect(screen.getByRole('option', { name: '기존: 과거카테고리' })).toBeInTheDocument();
-  });
-
-  it('shows edit and delete buttons for general expense records', () => {
-    render(<ExpenseRecords {...baseProps} />);
-
-    const section = screen.getByRole('heading', { name: '일반 지출 기록' }).closest('section');
-    expect(section).toBeInTheDocument();
-    expect(within(section).getAllByRole('button', { name: '수정' })).toHaveLength(10);
-    expect(within(section).getAllByRole('button', { name: '삭제' })).toHaveLength(10);
-  });
-
-  it('fills the general expense form and enters edit mode when edit is clicked', () => {
-    render(<ExpenseRecords {...baseProps} />);
-
-    const section = screen.getByRole('heading', { name: '일반 지출 기록' }).closest('section');
-    fireEvent.click(within(section).getAllByRole('button', { name: '수정' })[0]);
-
-    expect(screen.getByText('지출 기록 수정 중')).toBeInTheDocument();
-    expect(screen.getByText('1,000원 · 식비')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '지출 수정 저장' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '수정 취소' })).toBeInTheDocument();
-
-    expect(screen.getAllByLabelText('금액')[0]).toHaveValue(1000);
-    expect(screen.getAllByLabelText('카테고리')[0]).toHaveValue('식비');
-    expect(screen.getAllByLabelText('결제수단')[0]).toHaveValue('카드');
-    expect(screen.getAllByLabelText('지출 유형')[0]).toHaveValue('일반');
-    expect(screen.getAllByLabelText('메모')[0]).toHaveValue('');
-  });
-
-  it('updates an existing general expense record instead of adding a new one', () => {
+  it('shows the general expense edit form and updates an existing record', () => {
     const onUpdateExpenseRecord = vi.fn();
-    const onAddExpenseRecord = vi.fn();
+    const showToast = vi.fn();
 
-    render(
+    renderExpenseRecords(
       <ExpenseRecords
         {...baseProps}
-        onAddExpenseRecord={onAddExpenseRecord}
         onUpdateExpenseRecord={onUpdateExpenseRecord}
+        showToast={showToast}
       />
     );
 
-    const section = screen.getByRole('heading', { name: '일반 지출 기록' }).closest('section');
-    fireEvent.click(within(section).getAllByRole('button', { name: '수정' })[0]);
+    const generalSection = screen.getByRole('heading', { name: '일반 지출 기록 목록' }).closest('section');
+    fireEvent.click(within(generalSection).getAllByRole('button', { name: '수정' })[0]);
 
-    fireEvent.change(screen.getAllByLabelText('금액')[0], { target: { value: '2500' } });
-    fireEvent.change(screen.getAllByLabelText('메모')[0], { target: { value: '수정 메모' } });
+    expect(screen.getByText('지출 기록 수정 중')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '지출 수정 저장' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '수정 취소' })).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('금액'), { target: { value: '2500' } });
+    fireEvent.change(screen.getByLabelText('메모'), { target: { value: '수정 메모' } });
     fireEvent.click(screen.getByRole('button', { name: '지출 수정 저장' }));
 
-    expect(onAddExpenseRecord).not.toHaveBeenCalled();
     expect(onUpdateExpenseRecord).toHaveBeenCalledTimes(1);
     expect(onUpdateExpenseRecord).toHaveBeenCalledWith('record-0', {
       amount: '2500',
-      category: '식비',
+      category: GENERAL_EXPENSE_CATEGORIES[0],
       paymentMethod: '카드',
       type: '일반',
       memo: '수정 메모',
     });
+    expect(showToast).toHaveBeenCalledWith('일반 지출이 수정되었습니다');
   });
 
-  it('calls delete when general expense delete button is clicked', () => {
-    const onDeleteExpenseRecord = vi.fn();
+  it('shows recurring default date today and restores it after canceling edit', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 3, 29, 9, 0, 0));
 
-    render(
+    try {
+      renderExpenseRecords(<ExpenseRecords {...baseProps} />);
+
+      const recurringSection = openRecurringPage();
+      expect(screen.getByLabelText('결제일')).toHaveValue('2026-04-29');
+
+      fireEvent.click(within(recurringSection).getAllByRole('button', { name: '수정' })[0]);
+      expect(screen.getByLabelText('결제일')).toHaveValue('2026-04-05');
+
+      fireEvent.click(screen.getByRole('button', { name: '수정 취소' }));
+      expect(screen.getByLabelText('결제일')).toHaveValue('2026-04-29');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('shows recurring edit and delete controls', () => {
+    renderExpenseRecords(<ExpenseRecords {...baseProps} />);
+
+    const recurringSection = openRecurringPage();
+    expect(within(recurringSection).getAllByRole('button', { name: '수정' })).toHaveLength(1);
+    expect(within(recurringSection).getAllByRole('button', { name: '삭제' })).toHaveLength(1);
+  });
+
+  it('shows a toast after deleting a general expense', () => {
+    const onDeleteExpenseRecord = vi.fn();
+    const showToast = vi.fn();
+
+    renderExpenseRecords(
       <ExpenseRecords
         {...baseProps}
         onDeleteExpenseRecord={onDeleteExpenseRecord}
+        showToast={showToast}
       />
     );
 
-    const section = screen.getByRole('heading', { name: '일반 지출 기록' }).closest('section');
-    fireEvent.click(within(section).getAllByRole('button', { name: '삭제' })[0]);
+    const generalSection = screen.getByRole('heading', { name: '일반 지출 기록 목록' }).closest('section');
+    fireEvent.click(within(generalSection).getAllByRole('button', { name: '삭제' })[0]);
 
-    expect(onDeleteExpenseRecord).toHaveBeenCalledTimes(1);
     expect(onDeleteExpenseRecord).toHaveBeenCalledWith('record-0');
+    expect(showToast).toHaveBeenCalledWith('일반 지출이 삭제되었습니다');
   });
 
-  it('shows edit and delete buttons for recurring expenses', () => {
-    render(<ExpenseRecords {...baseProps} />);
+  it('shows a toast after saving a recurring expense', () => {
+    const onAddRecurringExpense = vi.fn();
+    const showToast = vi.fn();
 
-    const section = screen.getByRole('heading', { name: '정기지출' }).closest('section');
-    expect(section).toBeInTheDocument();
-    expect(within(section).getAllByRole('button', { name: '수정' })).toHaveLength(1);
-    expect(within(section).getAllByRole('button', { name: '삭제' })).toHaveLength(1);
-  });
-
-  it('fills the recurring form when edit is clicked and allows canceling edit mode', () => {
-    render(<ExpenseRecords {...baseProps} />);
-
-    const section = screen.getByRole('heading', { name: '정기지출' }).closest('section');
-    fireEvent.click(within(section).getAllByRole('button', { name: '수정' })[0]);
-
-    expect(screen.getByText('정기지출 수정 중')).toBeInTheDocument();
-    expect(screen.getByText('넷플릭스 · 17,000원')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('넷플릭스')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '정기지출 수정 저장' })).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: '수정 취소' }));
-
-    expect(screen.queryByText('정기지출 수정 중')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '정기지출 저장' })).toBeInTheDocument();
-    expect(screen.getByLabelText('항목명')).toHaveValue('');
-  });
-
-  it('calls update instead of add when recurring expense is edited', () => {
-    const onUpdateRecurringExpense = vi.fn();
-
-    render(
+    renderExpenseRecords(
       <ExpenseRecords
         {...baseProps}
-        onUpdateRecurringExpense={onUpdateRecurringExpense}
+        onAddRecurringExpense={onAddRecurringExpense}
+        showToast={showToast}
       />
     );
 
-    const section = screen.getByRole('heading', { name: '정기지출' }).closest('section');
-    fireEvent.click(within(section).getAllByRole('button', { name: '수정' })[0]);
-    fireEvent.change(screen.getByLabelText('항목명'), { target: { value: '유튜브 프리미엄' } });
-    fireEvent.click(screen.getByRole('button', { name: '정기지출 수정 저장' }));
-
-    expect(onUpdateRecurringExpense).toHaveBeenCalledTimes(1);
-    expect(onUpdateRecurringExpense).toHaveBeenCalledWith('recurring-1', {
-      name: '유튜브 프리미엄',
-      amount: '17000',
-      category: '주거/공과금',
-      paymentDay: '5',
-      paymentMethod: '카드',
-      memo: '가족 공유 요금',
+    const recurringSection = openRecurringPage();
+    fireEvent.change(within(recurringSection).getByLabelText('항목명'), {
+      target: { value: '넷플릭스' },
     });
+    fireEvent.change(within(recurringSection).getByLabelText('금액'), {
+      target: { value: '17000' },
+    });
+    fireEvent.click(within(recurringSection).getByRole('button', { name: '정기지출 저장' }));
+
+    expect(onAddRecurringExpense).toHaveBeenCalledTimes(1);
+    expect(showToast).toHaveBeenCalledWith('정기지출이 저장되었습니다');
   });
 
-  it('calls delete when recurring expense delete button is clicked', () => {
+  it('shows a toast after deleting a recurring expense', () => {
     const onDeleteRecurringExpense = vi.fn();
+    const showToast = vi.fn();
 
-    render(
+    renderExpenseRecords(
       <ExpenseRecords
         {...baseProps}
         onDeleteRecurringExpense={onDeleteRecurringExpense}
+        showToast={showToast}
       />
     );
 
-    const section = screen.getByRole('heading', { name: '정기지출' }).closest('section');
-    fireEvent.click(within(section).getAllByRole('button', { name: '삭제' })[0]);
+    const recurringSection = openRecurringPage();
+    fireEvent.click(within(recurringSection).getAllByRole('button', { name: '삭제' })[0]);
 
-    expect(onDeleteRecurringExpense).toHaveBeenCalledTimes(1);
     expect(onDeleteRecurringExpense).toHaveBeenCalledWith('recurring-1');
+    expect(showToast).toHaveBeenCalledWith('정기지출이 삭제되었습니다');
   });
 });

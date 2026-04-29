@@ -39,7 +39,7 @@ export default function Header({ currentUser, onLogout }) {
         {currentUser ? (
           <>
             <Link className="nav-link" to="/my-page">
-              {currentUser.name} 님
+              {currentUser.name}님
             </Link>
             <button className="nav-link button-link" type="button" onClick={onLogout}>
               로그아웃

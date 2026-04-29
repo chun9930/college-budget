@@ -1,15 +1,27 @@
 import { KEYS, loadJSON, removeJSON, saveJSON } from './storage';
 
+export const EMAIL_REGEX =
+  /^(?=.{1,254}$)(?=.{1,64}@)[a-zA-Z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-zA-Z0-9!#$%&'*+/=?^_`{|}~-]+)*@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+
 function normalizeEmail(email) {
   return String(email || '').trim().toLowerCase();
 }
 
+function normalizeUser(user) {
+  return {
+    name: String(user?.name || '').trim(),
+    email: normalizeEmail(user?.email),
+    password: String(user?.password || ''),
+  };
+}
+
 function loadUsers() {
-  return loadJSON(KEYS.users, []);
+  const users = loadJSON(KEYS.users, []);
+  return Array.isArray(users) ? users.map(normalizeUser).filter((user) => user.email) : [];
 }
 
 function saveUsers(users) {
-  saveJSON(KEYS.users, users);
+  saveJSON(KEYS.users, users.map(normalizeUser));
 }
 
 export function getCurrentUser() {
@@ -27,29 +39,32 @@ export function getCurrentUser() {
 }
 
 export function signup({ name, email, password, passwordConfirm }) {
-  const normalizedEmail = normalizeEmail(email);
   const normalizedName = String(name || '').trim();
+  const normalizedEmail = normalizeEmail(email);
   const normalizedPassword = String(password || '');
-
-  if (!normalizedName || !normalizedEmail || !normalizedPassword) {
-    return { ok: false, error: '필수 항목을 모두 입력해 주세요.' };
-  }
-
-  if (normalizedPassword !== String(passwordConfirm || '')) {
-    return { ok: false, error: '비밀번호 확인이 일치하지 않습니다.' };
-  }
-
+  const normalizedPasswordConfirm = String(passwordConfirm || '');
   const users = loadUsers();
+
+  if (!normalizedName || !normalizedEmail || !normalizedPassword || !normalizedPasswordConfirm) {
+    return { ok: false, error: '모든 항목을 입력해주세요.' };
+  }
+
+  if (!EMAIL_REGEX.test(normalizedEmail)) {
+    return { ok: false, error: '올바른 이메일 형식으로 입력해주세요.' };
+  }
+
   if (users.some((user) => user.email === normalizedEmail)) {
     return { ok: false, error: '이미 가입된 이메일입니다.' };
   }
 
+  if (normalizedPassword !== normalizedPasswordConfirm) {
+    return { ok: false, error: '비밀번호가 일치하지 않습니다.' };
+  }
+
   const user = {
-    id: crypto.randomUUID(),
     name: normalizedName,
     email: normalizedEmail,
     password: normalizedPassword,
-    createdAt: new Date().toISOString(),
   };
 
   saveUsers([user, ...users]);
@@ -57,7 +72,6 @@ export function signup({ name, email, password, passwordConfirm }) {
   return {
     ok: true,
     user: {
-      id: user.id,
       name: user.name,
       email: user.email,
     },
@@ -67,6 +81,11 @@ export function signup({ name, email, password, passwordConfirm }) {
 export function login({ email, password }) {
   const normalizedEmail = normalizeEmail(email);
   const normalizedPassword = String(password || '');
+
+  if (!EMAIL_REGEX.test(normalizedEmail)) {
+    return { ok: false, error: '올바른 이메일 형식으로 입력해주세요.' };
+  }
+
   const users = loadUsers();
   const user = users.find(
     (item) => item.email === normalizedEmail && item.password === normalizedPassword
@@ -77,13 +96,13 @@ export function login({ email, password }) {
   }
 
   const session = {
-    userId: user.id,
+    userId: user.email,
     email: user.email,
     isLoggedIn: true,
     loggedInAt: new Date().toISOString(),
   };
   const profile = {
-    userId: user.id,
+    userId: user.email,
     name: user.name,
     email: user.email,
   };
@@ -99,4 +118,3 @@ export function logout() {
   removeJSON(KEYS.userProfile);
   return { ok: true };
 }
-

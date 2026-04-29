@@ -1,11 +1,33 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { HashRouter } from 'react-router-dom';
+import { describe, expect, it } from 'vitest';
 import App from './App';
 import { calculateDailyBudget, calculateGoalSavingPlan, getRemainingDaysIncludingToday } from './lib/budget';
 import { getAlertState } from './lib/alert';
 import { applyRecurringExpenses } from './lib/recurring';
+import { KEYS } from './lib/storage';
+
+function seedAuth() {
+  window.localStorage.setItem(
+    KEYS.loginState,
+    JSON.stringify({
+      userId: 'hong@example.com',
+      email: 'hong@example.com',
+      isLoggedIn: true,
+      loggedInAt: '2026-04-29T09:00:00.000Z',
+    })
+  );
+  window.localStorage.setItem(
+    KEYS.userProfile,
+    JSON.stringify({
+      userId: 'hong@example.com',
+      name: '홍길동',
+      email: 'hong@example.com',
+    })
+  );
+}
 
 describe('college budget app', () => {
   beforeEach(() => {
@@ -13,18 +35,21 @@ describe('college budget app', () => {
     window.location.hash = '#/';
   });
 
-  it('renders home screen', () => {
+  it('redirects anonymous users to login on protected pages', () => {
+    window.location.hash = '#/budget-settings';
+
     render(
       <HashRouter>
         <App />
       </HashRouter>
     );
 
-    expect(screen.getByRole('heading', { name: '홈' })).toBeInTheDocument();
-    expect(screen.getByText('오늘 사용 가능 금액')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '로그인' })).toBeInTheDocument();
+    expect(screen.queryByRole('navigation', { name: '주요 페이지' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('navigation', { name: '하단 메뉴' })).not.toBeInTheDocument();
   });
 
-  it('renders login route', () => {
+  it('keeps login route public and hides chrome on auth pages', () => {
     window.location.hash = '#/login';
 
     render(
@@ -34,10 +59,12 @@ describe('college budget app', () => {
     );
 
     expect(screen.getByRole('heading', { name: '로그인' })).toBeInTheDocument();
+    expect(screen.queryByRole('navigation', { name: '주요 페이지' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('navigation', { name: '하단 메뉴' })).not.toBeInTheDocument();
   });
 
-  it('renders calendar route', () => {
-    window.location.hash = '#/calendar';
+  it('renders the home screen only after login', () => {
+    seedAuth();
 
     render(
       <HashRouter>
@@ -45,7 +72,24 @@ describe('college budget app', () => {
       </HashRouter>
     );
 
-    expect(screen.getByRole('heading', { name: '캘린더' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '로그아웃' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '분석 보러가기' })).toBeInTheDocument();
+  });
+
+  it('shows the login screen after logging out from an authenticated session', () => {
+    seedAuth();
+    window.location.hash = '#/';
+
+    render(
+      <HashRouter>
+        <App />
+      </HashRouter>
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '로그아웃' }));
+
+    expect(screen.getByRole('heading', { name: '로그인' })).toBeInTheDocument();
+    expect(screen.queryByRole('navigation', { name: '주요 페이지' })).not.toBeInTheDocument();
   });
 
   it('calculates daily budget with manual priority', () => {

@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import EmptyState from '../components/EmptyState';
 import PrimaryButton from '../components/PrimaryButton';
 
@@ -16,15 +17,6 @@ function toDateKey(date) {
   return `${current.getFullYear()}-${pad(current.getMonth() + 1)}-${pad(current.getDate())}`;
 }
 
-function getDateLabel(date) {
-  return new Date(date).toLocaleDateString('ko-KR', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    weekday: 'long',
-  });
-}
-
 function getSectionLabel(date) {
   return new Date(date).toLocaleDateString('ko-KR', {
     month: 'long',
@@ -35,6 +27,7 @@ function getSectionLabel(date) {
 
 function formatCompactWon(amount) {
   const value = Number(amount || 0);
+
   if (!Number.isFinite(value) || value === 0) {
     return '0원';
   }
@@ -43,7 +36,7 @@ function formatCompactWon(amount) {
   const absValue = Math.abs(value);
 
   if (absValue < 10000) {
-    return `${sign}${Math.round(absValue).toLocaleString()}원`;
+    return `${sign}${Math.round(absValue).toLocaleString('ko-KR')}원`;
   }
 
   const manValue = absValue / 10000;
@@ -100,7 +93,8 @@ function groupRecordsByDate(records) {
     .sort((left, right) => right.dateKey.localeCompare(left.dateKey));
 }
 
-export default function Calendar({ expenseRecords, onSelectDate }) {
+export default function Calendar({ expenseRecords, onSelectDate, onOpenExpenseRecord }) {
+  const navigate = useNavigate();
   const [monthCursor, setMonthCursor] = useState(() => new Date());
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [selectedDateKey, setSelectedDateKey] = useState(() => toDateKey(new Date()));
@@ -120,19 +114,12 @@ export default function Calendar({ expenseRecords, onSelectDate }) {
     [monthRecords]
   );
 
-  const activeDays = groupedRecords.length;
-  const averageDailySpend = activeDays > 0 ? monthTotal / activeDays : 0;
-
   useEffect(() => {
     const nextSelectedKey =
-      groupedRecords[0]?.dateKey || toDateKey(new Date(monthCursor.getFullYear(), monthCursor.getMonth(), 1));
+      groupedRecords[0]?.dateKey ||
+      toDateKey(new Date(monthCursor.getFullYear(), monthCursor.getMonth(), 1));
     setSelectedDateKey(nextSelectedKey);
   }, [groupedRecords, monthCursor]);
-
-  const selectedGroup = groupedRecords.find((group) => group.dateKey === selectedDateKey);
-  const selectedDateLabel = selectedGroup
-    ? getDateLabel(selectedGroup.date)
-    : getDateLabel(`${selectedDateKey}T00:00:00`);
 
   const moveMonth = (step) => {
     setMonthCursor((current) => new Date(current.getFullYear(), current.getMonth() + step, 1));
@@ -143,13 +130,28 @@ export default function Calendar({ expenseRecords, onSelectDate }) {
     month: 'long',
   });
 
+  const openExpenseRecord = (record) => {
+    if (onOpenExpenseRecord) {
+      onOpenExpenseRecord(record);
+      return;
+    }
+
+    navigate('/expense-records', { state: { editExpenseId: record.id } });
+  };
+
+  const handleSelectDate = (dateKey) => {
+    setSelectedDateKey(dateKey);
+    onSelectDate?.(dateKey);
+    navigate('/expense-records');
+  };
+
   return (
     <section className="page-stack calendar-page">
       <div className="page-hero calendar-hero">
         <div>
-          <h1 className="page-title">캘린더</h1>
+          <h1 className="page-title">달력</h1>
           <p className="page-subtitle">
-            기본 화면은 월별 지출 기록을 먼저 보여주고, 달력은 보조 영역으로 펼쳐서 확인합니다.
+            기본 화면은 월별 지출 내역을 먼저 보여 주고, 달력은 보조 영역으로 확인할 수 있습니다.
           </p>
         </div>
 
@@ -162,16 +164,21 @@ export default function Calendar({ expenseRecords, onSelectDate }) {
             다음 달
           </button>
         </div>
+      </div>
 
-        <div className="calendar-toggle-wrap">
-          <button
-            type="button"
-            className="calendar-toggle"
-            onClick={() => setIsCalendarOpen((current) => !current)}
-          >
-            {isCalendarOpen ? '접기' : '달력 보기'}
-          </button>
-        </div>
+      <div className="calendar-toggle-wrap">
+        <button
+          type="button"
+          className="calendar-toggle"
+          onClick={() => setIsCalendarOpen((current) => !current)}
+        >
+          {isCalendarOpen ? '접기' : '달력 보기'}
+        </button>
+      </div>
+
+      <div className="calendar-date-banner calendar-month-total">
+        <strong>이번달 지출</strong>
+        <span>{formatCompactWon(monthTotal)}</span>
       </div>
 
       {isCalendarOpen ? (
@@ -200,13 +207,12 @@ export default function Calendar({ expenseRecords, onSelectDate }) {
                   className={`calendar-day ${isSelected ? 'selected' : ''} ${
                     records.length > 0 ? 'has-record' : ''
                   }`}
-                  onClick={() => {
-                    setSelectedDateKey(dateKey);
-                    onSelectDate?.(dateKey);
-                  }}
+                  onClick={() => handleSelectDate(dateKey)}
                 >
                   <span className="calendar-day__date">{date.getDate()}</span>
-                  {records.length > 0 ? <span className="calendar-day__amount">{formatCompactWon(total)}</span> : null}
+                  {records.length > 0 ? (
+                    <span className="calendar-day__amount">{formatCompactWon(total)}</span>
+                  ) : null}
                 </button>
               );
             })}
@@ -220,7 +226,10 @@ export default function Calendar({ expenseRecords, onSelectDate }) {
             const isSelected = group.dateKey === selectedDateKey;
 
             return (
-              <section key={group.dateKey} className={`calendar-day-section ${isSelected ? 'is-selected' : ''}`}>
+              <section
+                key={group.dateKey}
+                className={`calendar-day-section ${isSelected ? 'is-selected' : ''}`}
+              >
                 <button
                   type="button"
                   className="calendar-day-section__header"
@@ -232,7 +241,12 @@ export default function Calendar({ expenseRecords, onSelectDate }) {
 
                 <div className="calendar-day-section__items">
                   {group.records.map((record) => (
-                    <div key={record.id} className="calendar-day-section__item">
+                    <button
+                      key={record.id}
+                      type="button"
+                      className="calendar-day-section__item calendar-day-section__item--button"
+                      onClick={() => openExpenseRecord(record)}
+                    >
                       <div className="calendar-day-section__item-main">
                         <strong>{formatCompactWon(record.amount)}</strong>
                         <span className="muted">
@@ -249,7 +263,7 @@ export default function Calendar({ expenseRecords, onSelectDate }) {
                           })}
                         </time>
                       </div>
-                    </div>
+                    </button>
                   ))}
                 </div>
               </section>
@@ -257,8 +271,8 @@ export default function Calendar({ expenseRecords, onSelectDate }) {
           })
         ) : (
           <EmptyState
-            title="이번 달 지출 기록이 없습니다"
-            description="지출 기록을 추가하면 날짜별 목록과 달력에서 함께 확인할 수 있습니다."
+            title="이번달 지출 기록이 없습니다"
+            description="지출 기록을 추가하면 날짜별 목록과 달력에서 확인할 수 있습니다."
             action={
               <PrimaryButton to="/expense-records" variant="ghost">
                 지출 기록으로 이동
@@ -267,55 +281,6 @@ export default function Calendar({ expenseRecords, onSelectDate }) {
           />
         )}
       </section>
-
-      <section className="calendar-detail card stack">
-        <div className="calendar-detail__header">
-          <div>
-            <h2 className="section-title">선택 날짜</h2>
-            <strong>{selectedDateLabel}</strong>
-          </div>
-          <div className="calendar-detail__total">
-            <span className="muted">지출 합계</span>
-            <strong>{formatCompactWon(selectedGroup?.total)}</strong>
-          </div>
-        </div>
-
-        {selectedGroup?.records?.length > 0 ? (
-          <div className="list">
-            {selectedGroup.records.map((record) => (
-              <div key={record.id} className="list-item calendar-record-item">
-                <div>
-                  <strong>{formatCompactWon(record.amount)}</strong>
-                  <div className="muted">
-                    {record.category} · {record.paymentMethod} · {record.type}
-                  </div>
-                  {record.memo ? <div className="muted">{record.memo}</div> : null}
-                </div>
-                <time className="muted" dateTime={record.date}>
-                  {new Date(record.date).toLocaleTimeString('ko-KR', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
-                </time>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <EmptyState
-            title="선택 날짜에는 기록이 없습니다"
-            description="위의 날짜 목록이나 달력에서 다른 날짜를 선택해 보세요."
-            action={
-              <PrimaryButton to="/expense-records" variant="ghost">
-                지출 기록으로 이동
-              </PrimaryButton>
-            }
-          />
-        )}
-      </section>
-
-      <div className="calendar-summary-note sr-only">
-        {formatCompactWon(monthTotal)} · {activeDays}일 · {formatCompactWon(averageDailySpend)}
-      </div>
     </section>
   );
 }

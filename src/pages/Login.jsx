@@ -1,24 +1,34 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import FormField from '../components/FormField';
 import PrimaryButton from '../components/PrimaryButton';
+import { EMAIL_REGEX } from '../lib/auth';
 
 const DEFAULT_FORM = {
   email: '',
   password: '',
 };
 
+const TEST_ACCOUNTS = [
+  {
+    email: '1234@naver.com',
+    password: '1234',
+    name: '테스트사용자',
+  },
+  {
+    email: 'student@pingo.com',
+    password: '12345',
+    name: '대학생테스트',
+  },
+];
+
 export default function Login({ currentUser, onLogin }) {
   const navigate = useNavigate();
   const [formState, setFormState] = useState(DEFAULT_FORM);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    setError('');
-  }, []);
-
   if (currentUser) {
-    return <Navigate to="/my-page" replace />;
+    return <Navigate to="/" replace />;
   }
 
   const updateField = (field) => (event) => {
@@ -26,10 +36,18 @@ export default function Login({ currentUser, onLogin }) {
       ...current,
       [field]: event.target.value,
     }));
+    setError('');
   };
 
   const handleSubmit = (event) => {
     event.preventDefault();
+
+    const normalizedEmail = String(formState.email || '').trim().toLowerCase();
+    if (!EMAIL_REGEX.test(normalizedEmail)) {
+      setError('올바른 이메일 형식으로 입력해주세요.');
+      return;
+    }
+
     const result = onLogin(formState);
 
     if (!result.ok) {
@@ -37,7 +55,7 @@ export default function Login({ currentUser, onLogin }) {
       return;
     }
 
-    navigate('/my-page');
+    navigate('/');
   };
 
   return (
@@ -45,7 +63,9 @@ export default function Login({ currentUser, onLogin }) {
       <div className="page-hero">
         <div>
           <h1 className="page-title">로그인</h1>
-          <p className="page-subtitle">mock auth로 이메일과 비밀번호만 확인합니다.</p>
+          <p className="page-subtitle">
+            mock auth 계정으로 이메일과 비밀번호를 확인합니다.
+          </p>
         </div>
       </div>
 
@@ -55,6 +75,7 @@ export default function Login({ currentUser, onLogin }) {
             id="login-email"
             type="email"
             autoComplete="email"
+            placeholder="이메일을 입력하세요"
             value={formState.email}
             onChange={updateField('email')}
           />
@@ -65,6 +86,7 @@ export default function Login({ currentUser, onLogin }) {
             id="login-password"
             type="password"
             autoComplete="current-password"
+            placeholder="비밀번호를 입력하세요"
             value={formState.password}
             onChange={updateField('password')}
           />
@@ -79,6 +101,20 @@ export default function Login({ currentUser, onLogin }) {
           </Link>
         </div>
       </form>
+
+      <section className="card stack login-test-card" aria-label="테스트 계정 안내">
+        <h2 className="section-title">테스트 계정 안내</h2>
+        <p className="muted">포트폴리오 확인용 mock 계정입니다. 실제 인증 정보가 아닙니다.</p>
+        <div className="login-test-list">
+          {TEST_ACCOUNTS.map((account) => (
+            <article key={account.email} className="login-test-item">
+              <strong>{account.name}</strong>
+              <p className="muted">이메일: {account.email}</p>
+              <p className="muted">비밀번호: {account.password}</p>
+            </article>
+          ))}
+        </div>
+      </section>
     </section>
   );
 }

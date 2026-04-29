@@ -1,91 +1,90 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { vi } from 'vitest';
+import { MemoryRouter } from 'react-router-dom';
 import Calendar from './Calendar';
+
+function renderCalendar(ui, initialEntries = ['/calendar']) {
+  return render(<MemoryRouter initialEntries={initialEntries}>{ui}</MemoryRouter>);
+}
 
 describe('Calendar', () => {
   const expenseRecords = [
     {
-      id: '1',
-      amount: 8000,
+      id: 'record-1',
+      amount: 33000,
       category: '식비',
-      paymentMethod: '체크카드',
+      paymentMethod: '카드',
       type: '일반',
-      date: '2026-04-28T09:00:00.000Z',
+      date: '2026-04-29T09:00:00.000Z',
       memo: '',
     },
     {
-      id: '2',
-      amount: 5000,
-      category: '카페',
+      id: 'record-2',
+      amount: 22000,
+      category: '교통',
       paymentMethod: '현금',
       type: '일반',
-      date: '2026-04-28T12:00:00.000Z',
-      memo: '점심 후',
+      date: '2026-04-29T12:00:00.000Z',
+      memo: '점심',
     },
     {
-      id: '3',
+      id: 'record-3',
       amount: 12000,
-      category: '교통',
-      paymentMethod: '교통카드',
+      category: '문화/여가',
+      paymentMethod: '카드',
       type: '일반',
-      date: '2026-04-27T18:00:00.000Z',
+      date: '2026-04-28T18:00:00.000Z',
       memo: '',
     },
   ];
 
-  it('keeps the calendar collapsed by default and shows the monthly list first', () => {
-    render(<Calendar expenseRecords={expenseRecords} />);
+  it('shows monthly spending records first and keeps the calendar collapsed by default', () => {
+    renderCalendar(<Calendar expenseRecords={expenseRecords} />);
 
-    expect(screen.getByRole('heading', { name: '캘린더' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '달력' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '달력 보기' })).toBeInTheDocument();
-    expect(screen.getByText('4월 28일 월요일')).toBeInTheDocument();
-    expect(screen.getByText('4월 27일 일요일')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '일' })).not.toBeInTheDocument();
+    expect(screen.getByText('이번달 지출')).toBeInTheDocument();
+    expect(screen.getByText('4월 29일 수요일')).toBeInTheDocument();
+    expect(screen.getByText('4월 28일 화요일')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '접기' })).not.toBeInTheDocument();
   });
 
   it('toggles the calendar grid open and closed', () => {
-    render(<Calendar expenseRecords={expenseRecords} />);
+    renderCalendar(<Calendar expenseRecords={expenseRecords} />);
 
     fireEvent.click(screen.getByRole('button', { name: '달력 보기' }));
     expect(screen.getByRole('button', { name: '접기' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '일' })).toBeInTheDocument();
-    expect(screen.getByText('1.3만')).toBeInTheDocument();
+    expect(screen.getByText('일')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: '접기' }));
     expect(screen.getByRole('button', { name: '달력 보기' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '일' })).not.toBeInTheDocument();
   });
 
-  it('highlights the selected date section when a calendar date is clicked', () => {
-    const { container } = render(<Calendar expenseRecords={expenseRecords} />);
-
-    fireEvent.click(screen.getByRole('button', { name: '달력 보기' }));
-
-    const selectedCalendarDay = Array.from(container.querySelectorAll('.calendar-day')).find((button) =>
-      button.textContent?.includes('27')
+  it('opens the expense record callback when a monthly record row is clicked', () => {
+    const onOpenExpenseRecord = vi.fn();
+    renderCalendar(
+      <Calendar expenseRecords={expenseRecords} onOpenExpenseRecord={onOpenExpenseRecord} />
     );
 
-    expect(selectedCalendarDay).toBeTruthy();
+    const section = screen.getByText('4월 29일 수요일').closest('section');
+    fireEvent.click(within(section).getByText('3.3만').closest('button'));
 
-    fireEvent.click(selectedCalendarDay);
-
-    const selectedSection = container.querySelector('.calendar-day-section.is-selected');
-    expect(selectedSection).toHaveTextContent('4월 27일 일요일');
-    expect(selectedSection).toHaveTextContent('1.2만');
+    expect(onOpenExpenseRecord).toHaveBeenCalledTimes(1);
+    expect(onOpenExpenseRecord).toHaveBeenCalledWith(expect.objectContaining({ id: 'record-1' }));
   });
 
   it('notifies the parent when a calendar date is selected', () => {
     const onSelectDate = vi.fn();
-    const { container } = render(
+    const { container } = renderCalendar(
       <Calendar expenseRecords={expenseRecords} onSelectDate={onSelectDate} />
     );
 
     fireEvent.click(screen.getByRole('button', { name: '달력 보기' }));
 
-    const targetDay = Array.from(container.querySelectorAll('.calendar-day')).find((button) =>
-      button.textContent?.includes('28')
+    const targetDay = Array.from(container.querySelectorAll('.calendar-day')).find(
+      (button) => button.textContent?.includes('28')
     );
 
     fireEvent.click(targetDay);

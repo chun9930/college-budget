@@ -1,10 +1,15 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { clearAllStorage, loadJSON, KEYS } from './storage';
-import { login, logout, signup, getCurrentUser } from './auth';
+import { EMAIL_REGEX, getCurrentUser, login, logout, signup } from './auth';
 
 describe('mock auth', () => {
   beforeEach(() => {
     clearAllStorage();
+  });
+
+  it('validates email format with the shared regex', () => {
+    expect(EMAIL_REGEX.test('test@example.com')).toBe(true);
+    expect(EMAIL_REGEX.test('1234')).toBe(false);
   });
 
   it('saves a new user and blocks duplicate emails', () => {
@@ -16,7 +21,7 @@ describe('mock auth', () => {
     });
 
     const duplicate = signup({
-      name: '다른 이름',
+      name: '둘리',
       email: 'hong@example.com',
       password: '1234',
       passwordConfirm: '1234',
@@ -24,7 +29,13 @@ describe('mock auth', () => {
 
     expect(first.ok).toBe(true);
     expect(duplicate.ok).toBe(false);
-    expect(loadJSON(KEYS.users, [])).toHaveLength(1);
+    expect(loadJSON(KEYS.users, [])).toEqual([
+      {
+        name: '홍길동',
+        email: 'hong@example.com',
+        password: '1234',
+      },
+    ]);
   });
 
   it('logs in and stores session data', () => {
@@ -42,6 +53,13 @@ describe('mock auth', () => {
       name: '홍길동',
       email: 'hong@example.com',
     });
+  });
+
+  it('rejects invalid email before checking credentials', () => {
+    const result = login({ email: '1234', password: '1234' });
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toBe('올바른 이메일 형식으로 입력해주세요.');
   });
 
   it('logs out and clears session data', () => {

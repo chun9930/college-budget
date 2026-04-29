@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import FormField from '../components/FormField';
 import PrimaryButton from '../components/PrimaryButton';
+import { EMAIL_REGEX } from '../lib/auth';
 
 const DEFAULT_FORM = {
   name: '',
@@ -16,7 +17,7 @@ export default function Signup({ currentUser, onSignup }) {
   const [error, setError] = useState('');
 
   if (currentUser) {
-    return <Navigate to="/my-page" replace />;
+    return <Navigate to="/" replace />;
   }
 
   const updateField = (field) => (event) => {
@@ -24,10 +25,17 @@ export default function Signup({ currentUser, onSignup }) {
       ...current,
       [field]: event.target.value,
     }));
+    setError('');
   };
 
   const handleSubmit = (event) => {
     event.preventDefault();
+
+    if (!EMAIL_REGEX.test(String(formState.email || '').trim().toLowerCase())) {
+      setError('올바른 이메일 형식으로 입력해주세요.');
+      return;
+    }
+
     const result = onSignup(formState);
 
     if (!result.ok) {
@@ -43,7 +51,7 @@ export default function Signup({ currentUser, onSignup }) {
       <div className="page-hero">
         <div>
           <h1 className="page-title">회원가입</h1>
-          <p className="page-subtitle">mock auth로 사용자 이름과 이메일을 저장합니다.</p>
+          <p className="page-subtitle">mock auth 사용자 이름, 이메일, 비밀번호를 생성합니다.</p>
         </div>
       </div>
 
@@ -51,6 +59,7 @@ export default function Signup({ currentUser, onSignup }) {
         <FormField id="signup-name" label="사용자 이름">
           <input
             id="signup-name"
+            placeholder="이름을 입력하세요"
             value={formState.name}
             onChange={updateField('name')}
           />
@@ -61,6 +70,7 @@ export default function Signup({ currentUser, onSignup }) {
             id="signup-email"
             type="email"
             autoComplete="email"
+            placeholder="example@email.com"
             value={formState.email}
             onChange={updateField('email')}
           />
@@ -71,6 +81,7 @@ export default function Signup({ currentUser, onSignup }) {
             id="signup-password"
             type="password"
             autoComplete="new-password"
+            placeholder="비밀번호를 입력하세요"
             value={formState.password}
             onChange={updateField('password')}
           />
@@ -81,6 +92,7 @@ export default function Signup({ currentUser, onSignup }) {
             id="signup-password-confirm"
             type="password"
             autoComplete="new-password"
+            placeholder="비밀번호를 다시 입력하세요"
             value={formState.passwordConfirm}
             onChange={updateField('passwordConfirm')}
           />

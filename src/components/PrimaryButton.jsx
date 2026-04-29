@@ -7,6 +7,8 @@ export default function PrimaryButton({
   onClick,
   type = 'button',
   variant = 'main',
+  disabled = false,
+  ...rest
 }) {
   const className = `primary-button ${variant}`;
 
@@ -19,7 +21,7 @@ export default function PrimaryButton({
   }
 
   return (
-    <button className={className} type={type} onClick={onClick}>
+    <button className={className} type={type} onClick={onClick} disabled={disabled} {...rest}>
       {children}
     </button>
   );

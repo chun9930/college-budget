@@ -1,43 +1,141 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
+import React, { useEffect, useMemo, useState } from 'react';
 import PrimaryButton from '../components/PrimaryButton';
 import MetricStrip from '../components/MetricStrip';
 import StatusBadge from '../components/StatusBadge';
+import { getHomeJudgmentSnapshot } from '../lib/alert';
 
 export default function Home({
   dailyBudget,
   todaySpent,
   alertState,
-  alertDismissed,
   fixedExpenseTotal,
   remainingDays,
   currentUser,
-  onDismissAlert,
+  hasBudgetSetup,
+  alertHistory = [],
+  onClearAlertHistory,
+  onMarkAlertHistoryRead,
 }) {
-  const shouldShowBanner = !alertDismissed && alertState.key !== 'safe';
+  const [isBannerExpanded, setIsBannerExpanded] = useState(true);
+  const [isAlertPanelOpen, setIsAlertPanelOpen] = useState(false);
+
+  const judgment = useMemo(
+    () =>
+      getHomeJudgmentSnapshot({
+        hasBudgetSetup,
+        alertState,
+        dailyBudget,
+        todaySpent,
+      }),
+    [alertState, dailyBudget, hasBudgetSetup, todaySpent]
+  );
+
+  const shouldShowBanner = judgment.statusKey !== 'safe';
+  const showCollapsedBanner = shouldShowBanner && !isBannerExpanded;
+  const handleToggleBanner = () => {
+    setIsBannerExpanded((current) => !current);
+  };
+
+  const unreadCount = useMemo(
+    () => alertHistory.filter((item) => !item.read).length,
+    [alertHistory]
+  );
+
+  const formattedAlertHistory = useMemo(
+    () =>
+      [...alertHistory].map((item) => ({
+        ...item,
+        createdAtLabel: new Intl.DateTimeFormat('ko-KR', {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+        }).format(new Date(item.createdAt)),
+      })),
+    [alertHistory]
+  );
+
+  useEffect(() => {
+    if (isAlertPanelOpen && onMarkAlertHistoryRead) {
+      onMarkAlertHistoryRead();
+    }
+  }, [isAlertPanelOpen, onMarkAlertHistoryRead]);
+
+  const handleToggleAlertPanel = () => {
+    setIsAlertPanelOpen((current) => !current);
+  };
+
+  const handleClearAlertHistory = () => {
+    onClearAlertHistory?.();
+    setIsAlertPanelOpen(false);
+  };
+
+  const bannerTone = judgment.statusKey === 'setup' ? 'warning' : judgment.statusKey;
 
   return (
-    <section className="page-stack">
-      <div className="page-hero">
-        <div>
-          <h1 className="page-title">홈</h1>
-          <p className="page-subtitle">
-            오늘 소비를 해도 되는지 빠르게 판단하고, 필요한 경우 바로 예산 설정으로 이동합니다.
-          </p>
+    <section className="page-stack home-page">
+      <div className="page-hero home-hero">
+        <div className="home-alert-anchor">
+          <button
+            type="button"
+            className="home-alert-button"
+            aria-label="알림 기록 보기"
+            onClick={handleToggleAlertPanel}
+          >
+            <span aria-hidden="true">🔔</span>
+            {unreadCount > 0 ? <span className="home-alert-button__badge">{unreadCount}</span> : null}
+          </button>
+
+          {isAlertPanelOpen ? (
+            <div className="home-alert-panel card stack" role="dialog" aria-label="알림 기록">
+              <div className="home-alert-panel__header">
+                <strong>알림 기록</strong>
+                <PrimaryButton type="button" variant="subtle" onClick={handleClearAlertHistory}>
+                  전체 삭제
+                </PrimaryButton>
+              </div>
+
+              {formattedAlertHistory.length > 0 ? (
+                <ul className="home-alert-list">
+                  {formattedAlertHistory.map((item) => (
+                    <li key={item.id} className={`home-alert-item ${item.read ? 'is-read' : ''}`}>
+                      <div className="home-alert-item__topline">
+                        <strong>{item.statusLabel}</strong>
+                        {item.relatedAmount != null ? (
+                          <span className="home-alert-item__amount">{item.relatedAmount.toLocaleString()}원</span>
+                        ) : null}
+                      </div>
+                      <p>{item.message}</p>
+                      <small>{item.createdAtLabel}</small>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="muted">알림 기록이 없습니다.</p>
+              )}
+            </div>
+          ) : null}
+        </div>
+
+        <div className="home-hero__content">
+          <p className="home-hero__eyebrow">즉시 소비 판단</p>
+          <h1 className="home-judgment__message">{judgment.message}</h1>
+          <p className="home-judgment__subtext">{judgment.description}</p>
+          <StatusBadge label={judgment.statusLabel} tone={judgment.statusKey === 'setup' ? 'warning' : judgment.statusKey} />
           {currentUser ? <p className="page-hero__meta">{currentUser.name} 님이 로그인되어 있습니다.</p> : null}
         </div>
-        <StatusBadge label={alertState.label} tone={alertState.key} />
       </div>
 
       {shouldShowBanner ? (
-        <div className={`alert-banner ${alertState.key}`}>
+        <div className={`alert-banner home-banner ${bannerTone} ${showCollapsedBanner ? 'is-collapsed' : ''}`}>
           <div className="alert-copy">
-            <h3>{alertState.label}</h3>
-            <p>{alertState.description}</p>
+            <h3>{judgment.statusLabel}</h3>
+            {showCollapsedBanner ? null : <p>{judgment.description}</p>}
           </div>
-          <div className="form-actions">
-            <PrimaryButton onClick={onDismissAlert} variant="subtle">
-              알림 숨기기
+          <div className="form-actions home-banner__actions">
+            <PrimaryButton onClick={handleToggleBanner} variant="subtle">
+              {isBannerExpanded ? '접기' : '펼치기'}
             </PrimaryButton>
           </div>
         </div>
@@ -63,28 +161,18 @@ export default function Home({
         ]}
       />
 
-      <div className="grid-2">
-        <article className="card stack">
-          <h2 className="section-title">빠른 이동</h2>
-          <div className="form-actions">
-            <PrimaryButton to="/expense-records">지출 입력</PrimaryButton>
-            <PrimaryButton to="/budget-settings" variant="ghost">
+      <article className="card stack home-actions">
+        <h2 className="section-title">빠른 이동</h2>
+        <div className="form-actions home-actions__buttons">
+          <PrimaryButton to="/expense-records">지출 입력</PrimaryButton>
+            <PrimaryButton to="/budget-settings" variant={hasBudgetSetup ? 'ghost' : 'main'}>
               예산 설정
             </PrimaryButton>
-          </div>
-        </article>
-
-        <article className="card stack">
-          <h2 className="section-title">상태 안내</h2>
-          <p className="muted">
-            안전 / 주의 / 위험 / 초과 상태를 텍스트와 색상으로 함께 보여 줍니다. 필요할 때만
-            세부 화면으로 이동하면 됩니다.
-          </p>
-          <Link className="muted" to="/statistics">
-            분석 보기
-          </Link>
-        </article>
-      </div>
+            <PrimaryButton to="/statistics" variant="subtle">
+            분석 보러가기
+          </PrimaryButton>
+        </div>
+      </article>
     </section>
   );
 }
