@@ -8,6 +8,8 @@ import {
   GENERAL_EXPENSE_CATEGORIES,
   RECURRING_EXPENSE_CATEGORIES,
 } from '../lib/categories';
+import { getExpensePreviewSnapshot } from '../lib/alert';
+import { getToday } from '../lib/budget';
 
 const DEFAULT_RECORD = {
   amount: '',
@@ -42,7 +44,7 @@ function getRecentPaymentMethodByCategory(records) {
   }, {});
 }
 
-function getDateKey(date = new Date()) {
+function getDateKey(date = getToday()) {
   const current = new Date(date);
   return `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}-${String(
     current.getDate()
@@ -63,11 +65,11 @@ function buildDateTimeFromDateKey(dateKey) {
   return `${dateKey}T00:00:00`;
 }
 
-function getTodayDateKey() {
-  return getDateKey(new Date());
+function getTodayDateKey(date = getToday()) {
+  return getDateKey(date);
 }
 
-function getRecurringDateValue(paymentDay) {
+function getRecurringDateValue(paymentDay, referenceDate = getToday()) {
   const text = String(paymentDay ?? '').trim();
 
   if (!text) {
@@ -85,7 +87,7 @@ function getRecurringDateValue(paymentDay) {
     return '';
   }
 
-  const current = new Date();
+  const current = new Date(referenceDate);
   const date = new Date(current.getFullYear(), current.getMonth(), day);
 
   if (Number.isNaN(date.getTime())) {
@@ -109,12 +111,12 @@ function getRecurringDayFromDateValue(dateValue) {
   return String(current.getDate());
 }
 
-function createDefaultRecurringForm() {
+function createDefaultRecurringForm(referenceDate = getToday()) {
   return {
     name: '',
     amount: '',
     category: DEFAULT_RECURRING.category,
-    paymentDay: getTodayDateKey(),
+    paymentDay: getTodayDateKey(referenceDate),
     paymentMethod: DEFAULT_RECURRING.paymentMethod,
     memo: '',
   };
@@ -170,9 +172,11 @@ function renderChoiceButtons(options, currentValue, onSelect, name, allowFallbac
 export default function ExpenseRecords({
   expenseRecords,
   recurringExpenses,
+  currentDate = getToday(),
   selectedDateKey,
   dailyBudget,
   todaySpent,
+  hasBudgetSetup,
   onAddExpenseRecord,
   onUpdateExpenseRecord,
   onDeleteExpenseRecord,
@@ -182,7 +186,7 @@ export default function ExpenseRecords({
   showToast,
 }) {
   const [recordForm, setRecordForm] = useState(DEFAULT_RECORD);
-  const [recurringForm, setRecurringForm] = useState(createDefaultRecurringForm());
+  const [recurringForm, setRecurringForm] = useState(() => createDefaultRecurringForm(currentDate));
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [recurringAdvancedOpen, setRecurringAdvancedOpen] = useState(false);
   const [lastPaymentMethod, setLastPaymentMethod] = useState(DEFAULT_RECORD.paymentMethod);
@@ -198,7 +202,7 @@ export default function ExpenseRecords({
     [expenseRecords]
   );
 
-  const currentMonthKey = useMemo(() => getMonthKey(new Date()), []);
+  const currentMonthKey = useMemo(() => getMonthKey(currentDate), [currentDate]);
 
   const currentMonthTotal = useMemo(
     () =>
@@ -224,30 +228,17 @@ export default function ExpenseRecords({
       ? recurringAmountValidation.message
       : '';
 
-  const selectedDateLabel = formatSelectedDate(selectedDateKey || getDateKey(new Date()));
-  const remainingBudget = Number(dailyBudget || 0) - Number(todaySpent || 0);
-  const previewMessage = useMemo(() => {
-    if (!generalAmountValidation.isValid) {
-      return '금액을 입력하면 저장 전 판단을 보여드립니다.';
-    }
-
-    if (!Number.isFinite(dailyBudget) || Number(dailyBudget || 0) <= 0) {
-      return '예산 설정이 필요해요';
-    }
-
-    if (generalAmountValidation.numericValue > remainingBudget) {
-      return '이 지출을 추가하면 오늘 예산을 초과합니다';
-    }
-
-    if (generalAmountValidation.numericValue > remainingBudget * 0.8) {
-      return '이 지출을 추가하면 오늘 예산의 80%를 넘겨요';
-    }
-
-    return `이 지출을 추가하면 오늘 ${Math.max(
-      0,
-      remainingBudget - generalAmountValidation.numericValue
-    ).toLocaleString()}원을 더 쓸 수 있어요`;
-  }, [dailyBudget, generalAmountValidation, remainingBudget]);
+  const selectedDateLabel = formatSelectedDate(selectedDateKey || getDateKey(currentDate));
+  const spendPreview = useMemo(
+    () =>
+      getExpensePreviewSnapshot({
+        hasBudgetSetup,
+        dailyBudget,
+        todaySpent,
+        inputAmount: recordForm.amount,
+      }),
+    [dailyBudget, hasBudgetSetup, recordForm.amount, todaySpent]
+  );
 
   const updateRecordField = (field) => (event) => {
     const value = event.target.value;
@@ -357,7 +348,7 @@ export default function ExpenseRecords({
       name: item.name || '',
       amount: String(item.amount || ''),
       category: item.category || DEFAULT_RECURRING.category,
-      paymentDay: getRecurringDateValue(item.paymentDay) || getTodayDateKey(),
+      paymentDay: getRecurringDateValue(item.paymentDay, currentDate) || getTodayDateKey(currentDate),
       paymentMethod: item.paymentMethod || DEFAULT_RECURRING.paymentMethod,
       memo: item.memo || '',
     });
@@ -368,7 +359,7 @@ export default function ExpenseRecords({
 
   const cancelRecurringEdit = () => {
     setEditingRecurringId(null);
-    setRecurringForm(createDefaultRecurringForm());
+    setRecurringForm(createDefaultRecurringForm(currentDate));
     setRecurringAdvancedOpen(false);
     setRecurringAmountTouched(false);
   };
@@ -441,7 +432,7 @@ export default function ExpenseRecords({
 
     onAddRecurringExpense(payload);
     showToast?.('정기지출이 저장되었습니다');
-    setRecurringForm(createDefaultRecurringForm());
+    setRecurringForm(createDefaultRecurringForm(currentDate));
     setRecurringAmountTouched(false);
   };
 
@@ -459,9 +450,9 @@ export default function ExpenseRecords({
       <div className="page-hero">
         <div>
           <h1 className="page-title">지출 기록</h1>
-          <p className="page-subtitle">
-            지출 기록은 최소 입력으로 빠르게 적고, 최근 기록과 정기지출로 다시 입력할 수 있습니다.
-          </p>
+          
+          <p className="expense-page-description">실제 생활 중 발생한 소비 기록을 적고 수정하는 영역입니다.</p>
+          <p className="expense-page-description">자동 반영된 정기지출 기록은 기록에는 남지만 예산 계산에서는 중복 제외됩니다.</p>
         </div>
       </div>
 
@@ -511,6 +502,11 @@ export default function ExpenseRecords({
             ]}
           />
 
+          <p className="muted expense-page-description">
+            일반 지출은 식비, 카페, 교통비처럼 실제 생활 중 발생한 소비를 기록하는 곳입니다.
+            자동 반영된 정기지출은 기록에는 남지만, 예산 계산에서는 중복 제외됩니다.
+          </p>
+
           <div className="expense-section__grid expense-section__grid--general">
             <form className="card form-grid" onSubmit={saveExpense}>
               <h3 className="section-title">지출 기록</h3>
@@ -534,7 +530,10 @@ export default function ExpenseRecords({
                   className={generalAmountError ? 'input-error' : ''}
                 />
                 {generalAmountError ? <p className="error-text">{generalAmountError}</p> : null}
-                <p className="muted expense-preview">{previewMessage}</p>
+                <p className={`muted expense-preview expense-preview--${spendPreview.statusKey}`}>
+                  <strong>{spendPreview.statusLabel}</strong>
+                  <span>{spendPreview.message}</span>
+                </p>
               </FormField>
 
               <FormField id="expense-category" label="카테고리">
@@ -608,6 +607,12 @@ export default function ExpenseRecords({
                           {item.category} · {item.paymentMethod}
                         </div>
                         <div className="muted">{new Date(item.date).toLocaleDateString('ko-KR')}</div>
+                        {item.sourceRecurringId ? (
+                          <>
+                            <span className="expense-source-badge">자동 정기지출</span>
+                            <p className="expense-source-note">예산 계산 중복 제외</p>
+                          </>
+                        ) : null}
                       </div>
                       <div className="inline-actions">
                         <button
@@ -682,6 +687,11 @@ export default function ExpenseRecords({
               ).toLocaleString()}원
             </span>
           </div>
+
+          <p className="muted expense-page-description">
+            정기지출은 월세, 통신비, 구독료처럼 반복되는 고정비입니다. 수동 고정지출과는
+            별도로 저장되며, 자동 반영을 켜면 예산 계산에 포함됩니다.
+          </p>
 
           <div className="grid-2 expense-section__grid">
             <form className="card form-grid" onSubmit={saveRecurring}>

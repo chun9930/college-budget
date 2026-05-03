@@ -55,6 +55,32 @@ const firstAccount = {
     goalPeriod: '222',
     currentSaving: '0',
   },
+  savingGoals: [
+    {
+      id: 'seed-goal-01',
+      name: '제주도 여행 자금',
+      category: '여행',
+      targetAmount: '1000000',
+      currentAmount: '250000',
+      deadline: '2026-08-31',
+    },
+    {
+      id: 'seed-goal-02',
+      name: '노트북 구매',
+      category: '전자기기',
+      targetAmount: '1500000',
+      currentAmount: '600000',
+      deadline: '2026-10-15',
+    },
+    {
+      id: 'seed-goal-03',
+      name: '비상금',
+      category: '비상금',
+      targetAmount: '2000000',
+      currentAmount: '800000',
+      deadline: '2026-12-31',
+    },
+  ],
   recurringExpenses: [
     makeRecurringExpense({
       id: 'seed-recurring-01',
@@ -195,6 +221,16 @@ const secondAccount = {
     goalPeriod: '90',
     currentSaving: '100000',
   },
+  savingGoals: [
+    {
+      id: 'student-goal-01',
+      name: '자격증 응시료',
+      category: '자격증',
+      targetAmount: '200000',
+      currentAmount: '50000',
+      deadline: '2026-06-30',
+    },
+  ],
   recurringExpenses: [],
   expenseRecords: [
     makeExpenseRecord({
@@ -237,6 +273,7 @@ export function buildSeedAccountData() {
       monthlyIncome: account.monthlyIncome,
       budgetSettings: account.budgetSettings,
       savingGoalSettings: account.savingGoalSettings,
+      savingGoals: account.savingGoals || [],
       expenseRecords: account.expenseRecords,
       recurringExpenses: account.recurringExpenses,
     };

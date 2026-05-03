@@ -156,7 +156,7 @@ export default function Home({
           {
             title: '고정지출 요약',
             value: `${Math.round(fixedExpenseTotal).toLocaleString()}원`,
-            note: '고정지출과 정기지출 포함',
+            note: '저장된 고정지출 기준',
           },
         ]}
       />

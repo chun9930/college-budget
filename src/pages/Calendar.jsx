@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import EmptyState from '../components/EmptyState';
 import PrimaryButton from '../components/PrimaryButton';
+import { getToday } from '../lib/budget';
 
 function pad(value) {
   return String(value).padStart(2, '0');
@@ -93,11 +94,16 @@ function groupRecordsByDate(records) {
     .sort((left, right) => right.dateKey.localeCompare(left.dateKey));
 }
 
-export default function Calendar({ expenseRecords, onSelectDate, onOpenExpenseRecord }) {
+export default function Calendar({
+  expenseRecords,
+  currentDate = getToday(),
+  onSelectDate,
+  onOpenExpenseRecord,
+}) {
   const navigate = useNavigate();
-  const [monthCursor, setMonthCursor] = useState(() => new Date());
+  const [monthCursor, setMonthCursor] = useState(() => getToday(currentDate));
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
-  const [selectedDateKey, setSelectedDateKey] = useState(() => toDateKey(new Date()));
+  const [selectedDateKey, setSelectedDateKey] = useState(() => toDateKey(currentDate));
 
   const monthKey = getMonthKey(monthCursor);
 
@@ -120,6 +126,16 @@ export default function Calendar({ expenseRecords, onSelectDate, onOpenExpenseRe
       toDateKey(new Date(monthCursor.getFullYear(), monthCursor.getMonth(), 1));
     setSelectedDateKey(nextSelectedKey);
   }, [groupedRecords, monthCursor]);
+
+  useEffect(() => {
+    const nextCurrentDate = getToday(currentDate);
+    setMonthCursor((current) =>
+      getMonthKey(current) === getMonthKey(nextCurrentDate)
+        ? current
+        : new Date(nextCurrentDate.getFullYear(), nextCurrentDate.getMonth(), 1)
+    );
+    setSelectedDateKey((current) => current || toDateKey(nextCurrentDate));
+  }, [currentDate]);
 
   const moveMonth = (step) => {
     setMonthCursor((current) => new Date(current.getFullYear(), current.getMonth() + step, 1));

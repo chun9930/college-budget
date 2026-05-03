@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import ExpenseRecords from './ExpenseRecords';
 import { GENERAL_EXPENSE_CATEGORIES, RECURRING_EXPENSE_CATEGORIES } from '../lib/categories';
+import { getExpensePreviewSnapshot } from '../lib/alert';
 
 function renderExpenseRecords(ui, initialEntries = ['/expense-records']) {
   return render(<MemoryRouter initialEntries={initialEntries}>{ui}</MemoryRouter>);
@@ -30,6 +31,7 @@ function createRecord(index, overrides = {}) {
 
 describe('ExpenseRecords', () => {
   const baseProps = {
+    currentDate: new Date('2026-04-30T09:00:00'),
     expenseRecords: Array.from({ length: 10 }, (_, index) => createRecord(index)),
     recurringExpenses: [
       {
@@ -52,6 +54,7 @@ describe('ExpenseRecords', () => {
     dailyBudget: 50000,
     todaySpent: 12000,
     selectedDateKey: '2026-04-28',
+    hasBudgetSetup: true,
   };
 
   it('shows 10 recent records in quick input', () => {
@@ -134,6 +137,18 @@ describe('ExpenseRecords', () => {
 
     fireEvent.click(saveButton);
     expect(onAddExpenseRecord).toHaveBeenCalledTimes(1);
+  });
+
+  it('builds a spend preview snapshot for the expense input flow', () => {
+    const snapshot = getExpensePreviewSnapshot({
+      hasBudgetSetup: true,
+      dailyBudget: 50000,
+      todaySpent: 12000,
+      inputAmount: '4200',
+    });
+
+    expect(snapshot.statusKey).toBe('safe');
+    expect(snapshot.message).toBe('이 지출을 추가하면 오늘 33,800원을 더 쓸 수 있어요');
   });
 
   it('validates the recurring expense amount field in real time', () => {

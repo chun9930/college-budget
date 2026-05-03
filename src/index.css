@@ -232,6 +232,40 @@ button {
   gap: 16px;
 }
 
+.settings-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.settings-tab {
+  min-height: 44px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.settings-tab.is-active {
+  background: var(--brand-soft);
+  border-color: transparent;
+  color: var(--brand);
+}
+
+.statistics-grid {
+  align-items: start;
+}
+
+.statistics-grid > * {
+  align-self: start;
+}
+
+.statistics-category-card {
+  align-content: start;
+}
+
 .card {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -546,7 +580,38 @@ button {
 }
 
 .expense-preview {
+  display: grid;
+  gap: 2px;
   margin: 8px 0 0;
+}
+
+.expense-preview strong {
+  color: var(--text-main);
+}
+
+.expense-preview--safe strong,
+.expense-preview--safe {
+  color: #1f7a3f;
+}
+
+.expense-preview--caution strong,
+.expense-preview--caution {
+  color: #b86b00;
+}
+
+.expense-preview--danger strong,
+.expense-preview--danger {
+  color: #b42318;
+}
+
+.expense-preview--over strong,
+.expense-preview--over {
+  color: #b42318;
+}
+
+.expense-preview--setup strong,
+.expense-preview--setup {
+  color: #6a7282;
 }
 
 .primary-button {
@@ -726,6 +791,117 @@ button {
   align-items: start;
 }
 
+.goal-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.goal-card {
+  padding: 18px;
+}
+
+.goal-card.is-editing {
+  border-color: rgba(31, 111, 235, 0.45);
+  box-shadow: 0 12px 28px rgba(31, 111, 235, 0.08);
+}
+
+.goal-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.goal-card__title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+
+.goal-card__category {
+  margin: 4px 0 0;
+}
+
+.goal-card__badge {
+  flex: 0 0 auto;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #fff4e5;
+  color: #b45309;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.goal-card__summary {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 18px;
+  background: #f8fbff;
+  border: 1px solid var(--border);
+}
+
+.goal-card__money {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.goal-card__money > div,
+.goal-card__progress,
+.goal-card__detail-item {
+  display: grid;
+  gap: 4px;
+}
+
+.goal-card__progress {
+  padding-top: 4px;
+  border-top: 1px solid rgba(31, 111, 235, 0.08);
+}
+
+.goal-card__progress strong {
+  font-size: 1.15rem;
+}
+
+.goal-card__detail-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 12px;
+}
+
+.goal-card__detail-item {
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: #ffffff;
+  border: 1px solid rgba(31, 111, 235, 0.08);
+}
+
+.goal-card__summary strong {
+  font-size: 1rem;
+}
+
+.goal-form {
+  margin-top: 4px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.budget-goals-section {
+  display: grid;
+  gap: 18px;
+}
+
+.budget-goals-description {
+  margin: 0;
+}
+
+.goal-form__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
 .budget-inline-stats {
   display: grid;
   gap: 12px;
@@ -742,6 +918,24 @@ button {
 
 .budget-inline-stat strong {
   font-size: 1.15rem;
+}
+
+.carry-over-panel {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid rgba(31, 111, 235, 0.16);
+  border-radius: 18px;
+  background: #f8fbff;
+}
+
+.carry-over-panel .section-head {
+  align-items: flex-start;
+}
+
+.carry-over-panel .budget-inline-stat {
+  min-width: 180px;
+  background: #ffffff;
 }
 
 .budget-actions {
@@ -946,6 +1140,94 @@ button {
 
 .expense-section__description {
   max-width: 62ch;
+}
+
+.expense-page-description {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.expense-source-note {
+  margin: 4px 0 0;
+  color: #1f7a3f;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.expense-source-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  margin-top: 6px;
+  padding: 0 10px;
+  border: 1px solid #b8e0c0;
+  border-radius: 999px;
+  background: #edf9ef;
+  color: #1f7a3f;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.budget-note {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.statistics-note {
+  margin-top: -4px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.statistics-note--accent {
+  color: #1d4ed8;
+}
+
+.statistics-month-controls {
+  display: grid;
+  gap: 12px;
+  padding: 16px 18px;
+  border-radius: 20px;
+}
+
+.statistics-month-controls__group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.statistics-month-controls__field {
+  flex: 1 1 180px;
+  min-width: 180px;
+}
+
+.statistics-month-controls__input {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--text-main);
+}
+
+.statistics-month-controls__button {
+  min-height: 44px;
+  padding: 0 16px;
+}
+
+.statistics-month-controls__note {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.budget-month-note {
+  margin: 4px 0 0;
+  color: var(--muted);
+  line-height: 1.6;
 }
 
 .expense-section__grid {
@@ -1335,6 +1617,52 @@ button {
   color: var(--text);
 }
 
+.statistics-category-trend {
+  margin: 0;
+  font-size: 0.84rem;
+}
+
+.feedback-card {
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  background: rgba(248, 250, 252, 0.72);
+}
+
+.feedback-card__head {
+  align-items: center;
+}
+
+.feedback-card__message {
+  margin: 0;
+  line-height: 1.55;
+}
+
+.student-tip-card {
+  display: grid;
+  gap: 8px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(37, 99, 235, 0.18);
+  background: rgba(239, 246, 255, 0.74);
+}
+
+.student-tip-card__head {
+  align-items: center;
+}
+
+.student-tip-card__reason,
+.student-tip-card__action {
+  margin: 0;
+  line-height: 1.55;
+}
+
+.student-tip-card__reason {
+  font-weight: 600;
+}
+
 .bottom-nav {
   display: none;
 }
@@ -1367,6 +1695,11 @@ button {
   }
 
   .budget-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .goal-grid,
+  .goal-form__grid {
     grid-template-columns: 1fr;
   }
 
@@ -1420,6 +1753,13 @@ button {
   .statistics-hero__meta {
     justify-items: start;
     text-align: left;
+  }
+}
+
+@media (max-width: 720px) {
+  .goal-card__money,
+  .goal-card__detail-list {
+    grid-template-columns: 1fr;
   }
 }
 

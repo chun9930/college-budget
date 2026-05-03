@@ -1,9 +1,11 @@
 import React from 'react';
 import { MemoryRouter } from 'react-router-dom';
-import { fireEvent, render, screen } from '@testing-library/react';
-import '@testing-library/jest-dom';
-import { describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import '@testing-library/jest-dom/vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import Home from './Home';
+
+afterEach(cleanup);
 
 function renderHome(props) {
   return render(
@@ -44,7 +46,10 @@ describe('Home', () => {
     });
 
     expect(screen.getByText('예산 설정이 필요해요')).toBeInTheDocument();
-    expect(screen.getByText('입력한 예산을 저장하면 오늘 소비 가능 여부를 바로 판단할 수 있어요.')).toBeInTheDocument();
+    expect(
+      screen.getAllByText('예산을 저장해야 오늘 사용 가능 금액을 정확하게 계산할 수 있어요.')
+        .length
+    ).toBeGreaterThan(0);
   });
 
   it('toggles the alert banner without persisting dismissal across refresh', () => {
@@ -52,11 +57,11 @@ describe('Home', () => {
       alertState: { key: 'danger', label: '위험', description: '오늘은 지출을 조심해 주세요.' },
     });
 
-    expect(screen.getByText('오늘은 지출을 조심해 주세요.')).toBeInTheDocument();
+    expect(screen.getAllByText('추가 소비는 한 번 더 확인해 주세요.')).toHaveLength(2);
 
     fireEvent.click(screen.getByRole('button', { name: '접기' }));
 
-    expect(screen.queryByText('오늘은 지출을 조심해 주세요.')).not.toBeInTheDocument();
+    expect(screen.getAllByText('추가 소비는 한 번 더 확인해 주세요.')).toHaveLength(1);
     expect(screen.getByRole('button', { name: '펼치기' })).toBeInTheDocument();
   });
 
@@ -77,9 +82,11 @@ describe('Home', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '알림 기록 보기' }));
 
-    expect(screen.getByRole('dialog', { name: '알림 기록' })).toBeInTheDocument();
-    expect(screen.getByText('오늘 예산을 초과했어요')).toBeInTheDocument();
-    expect(screen.getByText('12,000원')).toBeInTheDocument();
+    const dialog = screen.getByRole('dialog', { name: '알림 기록' });
+
+    expect(dialog).toBeInTheDocument();
+    expect(within(dialog).getByText('오늘 예산을 초과했어요')).toBeInTheDocument();
+    expect(within(dialog).getByText('12,000원')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '전체 삭제' })).toBeInTheDocument();
   });
 });

@@ -12,29 +12,42 @@ import Login from './pages/Login';
 import MyPage from './pages/MyPage';
 import Signup from './pages/Signup';
 import Statistics from './pages/Statistics';
-import { getAlertState, getHomeJudgmentSnapshot } from './lib/alert';
-import { calculateDailyBudget, calculateGoalSavingPlan, getRemainingDaysIncludingToday } from './lib/budget';
+import { getAlertState, getHomeJudgmentSnapshot, getMonthlyJudgmentSnapshot } from './lib/alert';
+import {
+  calculateAutomaticCarryOver,
+  calculateDailyBudget,
+  calculateGoalSavingPlan,
+  getToday,
+  getRemainingDaysIncludingToday,
+} from './lib/budget';
 import { login, logout, signup } from './lib/auth';
 import { applyRecurringExpenses } from './lib/recurring';
 import {
   KEYS,
   clearServiceStorage,
-  loadAccountSnapshot,
   loadJSON,
+  loadNormalizedServiceState,
   saveAccountSnapshot,
   saveJSON,
   seedMockDataIfNeeded,
 } from './lib/storage';
 
 const DEFAULT_BUDGET_SETTINGS = {
+  incomeMode: 'direct',
+  hourlyWage: '',
+  workHoursPerDay: '',
+  workDaysPerWeek: '',
   useManualBudget: false,
   manualDailyBudget: '',
   fixedExpenseAmount: '',
+  autoIncludeRecurringExpenses: false,
   emergencyFundAmount: '',
   goalEnabled: true,
   periodCalculationEnabled: true,
   carryOverEnabled: true,
   carryOverAmount: '',
+  manualCarryOverEnabled: false,
+  manualCarryOverAmount: '',
 };
 
 const DEFAULT_SAVING_GOAL_SETTINGS = {
@@ -43,12 +56,17 @@ const DEFAULT_SAVING_GOAL_SETTINGS = {
   currentSaving: '',
 };
 
+const DEFAULT_SAVING_GOALS = [];
+
 const DEFAULT_ALERT_STATE = {
   dismissed: false,
   lastState: 'safe',
 };
 
-const today = new Date();
+const DEFAULT_CARRY_OVER_STATE = {
+  lastCalculatedMonth: '',
+  monthlySnapshots: {},
+};
 
 function toNumber(value) {
   const parsed = Number(value);
@@ -65,6 +83,19 @@ function isSameDay(left, right) {
 
 function isSameMonth(left, right) {
   return left.getFullYear() === right.getFullYear() && left.getMonth() === right.getMonth();
+}
+
+function isSamePreviousMonth(left, right) {
+  const previousMonth = new Date(right.getFullYear(), right.getMonth() - 1, 1);
+  return (
+    left.getFullYear() === previousMonth.getFullYear() &&
+    left.getMonth() === previousMonth.getMonth()
+  );
+}
+
+function getMonthKey(date = new Date()) {
+  const current = new Date(date);
+  return `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}`;
 }
 
 function getDateKey(date = new Date()) {
@@ -100,62 +131,6 @@ function emptyGoalPlan() {
   };
 }
 
-function createEmptyAccountSnapshot() {
-  return {
-    monthlyIncome: 0,
-    budgetSettings: DEFAULT_BUDGET_SETTINGS,
-    savingGoalSettings: DEFAULT_SAVING_GOAL_SETTINGS,
-    expenseRecords: [],
-    recurringExpenses: [],
-    alertState: DEFAULT_ALERT_STATE,
-    alertHistory: [],
-  };
-}
-
-function normalizeAccountSnapshot(snapshot) {
-  if (!snapshot || typeof snapshot !== 'object') {
-    return createEmptyAccountSnapshot();
-  }
-
-  return {
-    monthlyIncome: snapshot.monthlyIncome ?? 0,
-    budgetSettings: snapshot.budgetSettings ?? DEFAULT_BUDGET_SETTINGS,
-    savingGoalSettings: snapshot.savingGoalSettings ?? DEFAULT_SAVING_GOAL_SETTINGS,
-    expenseRecords: Array.isArray(snapshot.expenseRecords) ? snapshot.expenseRecords : [],
-    recurringExpenses: Array.isArray(snapshot.recurringExpenses) ? snapshot.recurringExpenses : [],
-    alertState: snapshot.alertState ?? DEFAULT_ALERT_STATE,
-    alertHistory: Array.isArray(snapshot.alertHistory) ? snapshot.alertHistory : [],
-  };
-}
-
-function loadAccountStateByEmail(email) {
-  const snapshot = email ? loadAccountSnapshot(email) : null;
-  if (snapshot) {
-    return normalizeAccountSnapshot(snapshot);
-  }
-
-  return normalizeAccountSnapshot({
-    monthlyIncome: loadJSON(KEYS.monthlyIncome, 0),
-    budgetSettings: loadJSON(KEYS.budgetSettings, DEFAULT_BUDGET_SETTINGS),
-    savingGoalSettings: loadJSON(KEYS.savingGoalSettings, DEFAULT_SAVING_GOAL_SETTINGS),
-    expenseRecords: loadJSON(KEYS.expenseRecords, []),
-    recurringExpenses: loadJSON(KEYS.recurringExpenses, []),
-    alertState: loadJSON(KEYS.alertState, DEFAULT_ALERT_STATE),
-    alertHistory: loadJSON(KEYS.alertHistory, []),
-  });
-}
-
-function loadSeededServiceValue(email, key, fallback) {
-  if (email) {
-    const snapshot = loadAccountSnapshot(email);
-    if (snapshot && Object.prototype.hasOwnProperty.call(snapshot, key)) {
-      return snapshot[key];
-    }
-  }
-
-  return loadJSON(key, fallback);
-}
-
 function RequireAuth({ isAuthed, children }) {
   return isAuthed ? children : <Navigate to="/login" replace />;
 }
@@ -168,30 +143,22 @@ export default function App() {
   const initialUserProfile = loadJSON(KEYS.userProfile, null);
   const initialAccountEmail =
     initialLoginState?.isLoggedIn && initialUserProfile?.email ? initialUserProfile.email : '';
-  const [monthlyIncome, setMonthlyIncome] = useState(() =>
-    loadSeededServiceValue(initialAccountEmail, KEYS.monthlyIncome, 0)
+  const initialAccountState = loadNormalizedServiceState(initialAccountEmail);
+  const [monthlyIncome, setMonthlyIncome] = useState(() => initialAccountState.monthlyIncome);
+  const [budgetSettings, setBudgetSettings] = useState(() => initialAccountState.budgetSettings);
+  const [savingGoalSettings, setSavingGoalSettings] = useState(
+    () => initialAccountState.savingGoalSettings
   );
-  const [budgetSettings, setBudgetSettings] = useState(() =>
-    loadSeededServiceValue(initialAccountEmail, KEYS.budgetSettings, DEFAULT_BUDGET_SETTINGS)
+  const [savingGoals, setSavingGoals] = useState(() => initialAccountState.savingGoals);
+  const [expenseRecords, setExpenseRecords] = useState(() => initialAccountState.expenseRecords);
+  const [recurringExpenses, setRecurringExpenses] = useState(
+    () => initialAccountState.recurringExpenses
   );
-  const [savingGoalSettings, setSavingGoalSettings] = useState(() =>
-    loadSeededServiceValue(
-      initialAccountEmail,
-      KEYS.savingGoalSettings,
-      DEFAULT_SAVING_GOAL_SETTINGS
-    )
-  );
-  const [expenseRecords, setExpenseRecords] = useState(() =>
-    loadSeededServiceValue(initialAccountEmail, KEYS.expenseRecords, [])
-  );
-  const [recurringExpenses, setRecurringExpenses] = useState(() =>
-    loadSeededServiceValue(initialAccountEmail, KEYS.recurringExpenses, [])
-  );
-  const [expenseDraftDateKey, setExpenseDraftDateKey] = useState(() => getDateKey(today));
-  const [alertStateState, setAlertStateState] = useState(() =>
-    loadJSON(KEYS.alertState, DEFAULT_ALERT_STATE)
-  );
-  const [alertHistory, setAlertHistory] = useState(() => loadJSON(KEYS.alertHistory, []));
+  const [carryOverState, setCarryOverState] = useState(() => initialAccountState.carryOverState);
+  const [currentDate, setCurrentDate] = useState(() => getToday());
+  const [expenseDraftDateKey, setExpenseDraftDateKey] = useState(() => getDateKey(currentDate));
+  const [alertStateState, setAlertStateState] = useState(() => initialAccountState.alertState);
+  const [alertHistory, setAlertHistory] = useState(() => initialAccountState.alertHistory);
   const [loginState, setLoginState] = useState(() => initialLoginState);
   const [userProfile, setUserProfile] = useState(() => initialUserProfile);
   const [toast, setToast] = useState(null);
@@ -219,6 +186,10 @@ export default function App() {
   }, [savingGoalSettings]);
 
   useEffect(() => {
+    saveJSON(KEYS.savingGoals, savingGoals);
+  }, [savingGoals]);
+
+  useEffect(() => {
     saveJSON(KEYS.expenseRecords, expenseRecords);
   }, [expenseRecords]);
 
@@ -242,6 +213,17 @@ export default function App() {
     saveJSON(KEYS.userProfile, userProfile);
   }, [userProfile]);
 
+  useEffect(() => {
+    const timerId = window.setInterval(() => {
+      setCurrentDate((current) => {
+        const next = getToday();
+        return getDateKey(current) === getDateKey(next) ? current : next;
+      });
+    }, 60000);
+
+    return () => window.clearInterval(timerId);
+  }, []);
+
   useEffect(
     () => () => {
       window.clearTimeout(toastTimerRef.current);
@@ -251,10 +233,10 @@ export default function App() {
 
   useEffect(() => {
     setExpenseRecords((current) => {
-      const next = applyRecurringExpenses(current, recurringExpenses, today);
+      const next = applyRecurringExpenses(current, recurringExpenses, currentDate);
       return next.length === current.length ? current : next;
     });
-  }, [recurringExpenses]);
+  }, [currentDate, recurringExpenses]);
 
   const currentUser = useMemo(() => {
     if (!loginState?.isLoggedIn || !userProfile) {
@@ -272,15 +254,17 @@ export default function App() {
       return;
     }
 
-    const snapshot = loadAccountStateByEmail(currentUser.email);
+    const snapshot = loadNormalizedServiceState(currentUser.email);
 
     setMonthlyIncome(snapshot.monthlyIncome);
     setBudgetSettings(snapshot.budgetSettings);
     setSavingGoalSettings(snapshot.savingGoalSettings);
+    setSavingGoals(snapshot.savingGoals ?? DEFAULT_SAVING_GOALS);
     setExpenseRecords(snapshot.expenseRecords);
     setRecurringExpenses(snapshot.recurringExpenses);
     setAlertStateState(snapshot.alertState);
     setAlertHistory(snapshot.alertHistory);
+    setCarryOverState(snapshot.carryOverState ?? DEFAULT_CARRY_OVER_STATE);
   }, [currentUser?.email]);
 
   useEffect(() => {
@@ -288,18 +272,17 @@ export default function App() {
       return;
     }
 
-    saveAccountSnapshot(
-      currentUser.email,
-      normalizeAccountSnapshot({
-        monthlyIncome,
-        budgetSettings,
-        savingGoalSettings,
-        expenseRecords,
-        recurringExpenses,
-        alertState: alertStateState,
-        alertHistory,
-      })
-    );
+    saveAccountSnapshot(currentUser.email, {
+      monthlyIncome,
+      budgetSettings,
+      savingGoalSettings,
+      savingGoals,
+      expenseRecords,
+      recurringExpenses,
+      alertState: alertStateState,
+      alertHistory,
+      carryOverState,
+    });
   }, [
     alertHistory,
     alertStateState,
@@ -309,19 +292,26 @@ export default function App() {
     monthlyIncome,
     recurringExpenses,
     savingGoalSettings,
+    savingGoals,
+    carryOverState,
   ]);
 
   const isAuthed = Boolean(currentUser);
   const showChrome = isAuthed && !['/login', '/signup'].includes(location.pathname);
 
-  const remainingDays = getRemainingDaysIncludingToday(today);
+  const remainingDays = getRemainingDaysIncludingToday(currentDate);
+  const currentMonthKey = getMonthKey(currentDate);
 
-  const recurringMonthlyTotal = useMemo(
-    () => recurringExpenses.reduce((sum, item) => sum + toNumber(item.amount), 0),
+  const recurringTotal = useMemo(
+    () =>
+      recurringExpenses.reduce((sum, item) => sum + toNumber(item.amount), 0),
     [recurringExpenses]
   );
 
-  const fixedExpenseTotal = toNumber(budgetSettings.fixedExpenseAmount) + recurringMonthlyTotal;
+  const manualFixedExpenseAmount = toNumber(budgetSettings.fixedExpenseAmount);
+  const totalFixedExpense =
+    manualFixedExpenseAmount +
+    (budgetSettings.autoIncludeRecurringExpenses ? recurringTotal : 0);
 
   const goalPlan = useMemo(() => {
     if (!budgetSettings.goalEnabled) {
@@ -331,47 +321,126 @@ export default function App() {
     return calculateGoalSavingPlan(savingGoalSettings);
   }, [budgetSettings.goalEnabled, savingGoalSettings]);
 
-  const monthSpent = useMemo(
+  const displayMonthSpent = useMemo(
     () =>
       expenseRecords
-        .filter((record) => isSameMonth(new Date(record.date), today))
+        .filter((record) => isSameMonth(new Date(record.date), currentDate))
         .reduce((sum, record) => sum + toNumber(record.amount), 0),
-    [expenseRecords]
+    [currentDate, expenseRecords]
+  );
+
+  const budgetMonthSpent = useMemo(
+    () =>
+      expenseRecords
+        .filter((record) => isSameMonth(new Date(record.date), currentDate))
+        .filter(
+          (record) =>
+            !(
+              budgetSettings.autoIncludeRecurringExpenses &&
+              record.sourceRecurringId
+            )
+        )
+        .reduce((sum, record) => sum + toNumber(record.amount), 0),
+    [budgetSettings.autoIncludeRecurringExpenses, currentDate, expenseRecords]
+  );
+
+  const previousMonthSpent = useMemo(
+    () =>
+      expenseRecords
+        .filter((record) => isSamePreviousMonth(new Date(record.date), currentDate))
+        .reduce((sum, record) => sum + toNumber(record.amount), 0),
+    [currentDate, expenseRecords]
+  );
+
+  const autoCarryOverSnapshot = carryOverState.monthlySnapshots?.[currentMonthKey];
+  const calculatedAutomaticCarryOverAmount = useMemo(
+    () =>
+      calculateAutomaticCarryOver({
+        monthlyIncome,
+        targetSavings: budgetSettings.goalEnabled ? goalPlan.remainingAmount : '',
+        emergencyFund: budgetSettings.emergencyFundAmount,
+        fixedExpenses: totalFixedExpense,
+        spent: previousMonthSpent,
+      }),
+    [
+      budgetSettings.emergencyFundAmount,
+      budgetSettings.goalEnabled,
+      goalPlan.remainingAmount,
+      monthlyIncome,
+      previousMonthSpent,
+      totalFixedExpense,
+    ]
   );
 
   const todaySpent = useMemo(
     () =>
       expenseRecords
-        .filter((record) => isSameDay(new Date(record.date), today))
+        .filter((record) => isSameDay(new Date(record.date), currentDate))
         .reduce((sum, record) => sum + toNumber(record.amount), 0),
-    [expenseRecords]
+    [currentDate, expenseRecords]
   );
+
+  const automaticCarryOverAmount =
+    autoCarryOverSnapshot && Number.isFinite(Number(autoCarryOverSnapshot.automaticCarryOverAmount))
+      ? Number(autoCarryOverSnapshot.automaticCarryOverAmount)
+      : calculatedAutomaticCarryOverAmount;
+
+  const effectiveCarryOverAmount =
+    budgetSettings.carryOverEnabled
+      ? budgetSettings.manualCarryOverEnabled
+        ? budgetSettings.manualCarryOverAmount
+        : automaticCarryOverAmount
+      : '';
 
   const dailyBudget = useMemo(
     () =>
       calculateDailyBudget({
         monthlyIncome,
         manualDailyBudget: budgetSettings.useManualBudget ? budgetSettings.manualDailyBudget : '',
-        carryOver: budgetSettings.carryOverEnabled ? budgetSettings.carryOverAmount : '',
+        carryOver: effectiveCarryOverAmount,
         targetSavings: budgetSettings.goalEnabled ? goalPlan.remainingAmount : '',
         emergencyFund: budgetSettings.emergencyFundAmount,
-        fixedExpenses: fixedExpenseTotal,
-        spent: monthSpent,
+        fixedExpenses: totalFixedExpense,
+        spent: budgetMonthSpent,
         remainingDays,
       }),
     [
-      budgetSettings.carryOverAmount,
       budgetSettings.carryOverEnabled,
       budgetSettings.emergencyFundAmount,
       budgetSettings.fixedExpenseAmount,
       budgetSettings.goalEnabled,
+      budgetSettings.autoIncludeRecurringExpenses,
+      budgetSettings.manualCarryOverAmount,
+      budgetSettings.manualCarryOverEnabled,
       budgetSettings.manualDailyBudget,
       budgetSettings.useManualBudget,
-      fixedExpenseTotal,
+      effectiveCarryOverAmount,
+      totalFixedExpense,
       goalPlan.remainingAmount,
-      monthSpent,
+      budgetMonthSpent,
       monthlyIncome,
       remainingDays,
+      recurringTotal,
+    ]
+  );
+
+  const monthlyBudgetBase = useMemo(
+    () =>
+      Math.max(
+        0,
+        toNumber(monthlyIncome) +
+          toNumber(effectiveCarryOverAmount) -
+          (budgetSettings.goalEnabled ? goalPlan.remainingAmount : 0) -
+          toNumber(budgetSettings.emergencyFundAmount) -
+          totalFixedExpense
+      ),
+    [
+      budgetSettings.emergencyFundAmount,
+      budgetSettings.goalEnabled,
+      effectiveCarryOverAmount,
+      goalPlan.remainingAmount,
+      monthlyIncome,
+      totalFixedExpense,
     ]
   );
 
@@ -382,14 +451,7 @@ export default function App() {
 
   const hasBudgetSetup =
     toNumber(monthlyIncome) > 0 ||
-    budgetSettings.useManualBudget ||
-    toNumber(budgetSettings.manualDailyBudget) > 0 ||
-    toNumber(budgetSettings.fixedExpenseAmount) > 0 ||
-    toNumber(budgetSettings.emergencyFundAmount) > 0 ||
-    toNumber(budgetSettings.carryOverAmount) > 0 ||
-    toNumber(savingGoalSettings.goalAmount) > 0 ||
-    toNumber(savingGoalSettings.goalPeriod) > 0 ||
-    toNumber(savingGoalSettings.currentSaving) > 0;
+    (budgetSettings.useManualBudget && toNumber(budgetSettings.manualDailyBudget) > 0);
 
   const homeJudgmentSnapshot = useMemo(
     () =>
@@ -401,6 +463,56 @@ export default function App() {
       }),
     [alertState, dailyBudget, hasBudgetSetup, todaySpent]
   );
+
+  const monthlyJudgmentSnapshot = useMemo(
+    () =>
+      getMonthlyJudgmentSnapshot({
+        hasBudgetSetup,
+        monthlyBudget: monthlyBudgetBase,
+        monthSpent: budgetMonthSpent,
+      }),
+    [budgetMonthSpent, hasBudgetSetup, monthlyBudgetBase]
+  );
+
+  useEffect(() => {
+    if (!currentUser?.email || !budgetSettings.carryOverEnabled || budgetSettings.manualCarryOverEnabled) {
+      return;
+    }
+
+    setCarryOverState((current) => {
+      const currentSnapshots =
+        current.monthlySnapshots && typeof current.monthlySnapshots === 'object'
+          ? current.monthlySnapshots
+          : {};
+      const existingSnapshot = currentSnapshots[currentMonthKey];
+      const nextSnapshot = {
+        automaticCarryOverAmount: calculatedAutomaticCarryOverAmount,
+        calculatedAt: new Date().toISOString(),
+      };
+
+      if (
+        current.lastCalculatedMonth === currentMonthKey &&
+        existingSnapshot &&
+        Number(existingSnapshot.automaticCarryOverAmount || 0) === calculatedAutomaticCarryOverAmount
+      ) {
+        return current;
+      }
+
+      return {
+        lastCalculatedMonth: currentMonthKey,
+        monthlySnapshots: {
+          ...currentSnapshots,
+          [currentMonthKey]: nextSnapshot,
+        },
+      };
+    });
+  }, [
+    calculatedAutomaticCarryOverAmount,
+    budgetSettings.carryOverEnabled,
+    budgetSettings.manualCarryOverEnabled,
+    currentMonthKey,
+    currentUser?.email,
+  ]);
 
   useEffect(() => {
     setAlertStateState((current) =>
@@ -440,14 +552,54 @@ export default function App() {
     });
   }, [homeJudgmentSnapshot]);
 
+  useEffect(() => {
+    if (!currentUser?.email || !budgetSettings.carryOverEnabled || budgetSettings.manualCarryOverEnabled) {
+      return;
+    }
+
+    setCarryOverState((current) => {
+      const currentSnapshots =
+        current.monthlySnapshots && typeof current.monthlySnapshots === 'object'
+          ? current.monthlySnapshots
+          : {};
+      const existingSnapshot = currentSnapshots[currentMonthKey];
+      const nextSnapshot = {
+        automaticCarryOverAmount: calculatedAutomaticCarryOverAmount,
+        calculatedAt: new Date().toISOString(),
+      };
+
+      if (
+        current.lastCalculatedMonth === currentMonthKey &&
+        existingSnapshot &&
+        Number(existingSnapshot.automaticCarryOverAmount || 0) === calculatedAutomaticCarryOverAmount
+      ) {
+        return current;
+      }
+
+      return {
+        lastCalculatedMonth: currentMonthKey,
+        monthlySnapshots: {
+          ...currentSnapshots,
+          [currentMonthKey]: nextSnapshot,
+        },
+      };
+    });
+  }, [
+    calculatedAutomaticCarryOverAmount,
+    budgetSettings.carryOverEnabled,
+    budgetSettings.manualCarryOverEnabled,
+    currentMonthKey,
+    currentUser?.email,
+  ]);
+
   const handleLogin = (formState) => {
     const result = login(formState);
     if (result.ok) {
       setLoginState(loadJSON(KEYS.loginState, null));
       setUserProfile(loadJSON(KEYS.userProfile, null));
 
-      const snapshot = normalizeAccountSnapshot(
-        loadAccountStateByEmail(String(result.user?.email || formState.email || '').trim().toLowerCase())
+      const snapshot = loadNormalizedServiceState(
+        String(result.user?.email || formState.email || '').trim().toLowerCase()
       );
 
       setMonthlyIncome(snapshot.monthlyIncome);
@@ -476,9 +628,11 @@ export default function App() {
     setMonthlyIncome(0);
     setBudgetSettings(DEFAULT_BUDGET_SETTINGS);
     setSavingGoalSettings(DEFAULT_SAVING_GOAL_SETTINGS);
+    setSavingGoals(DEFAULT_SAVING_GOALS);
     setExpenseRecords([]);
     setRecurringExpenses([]);
-    setExpenseDraftDateKey(getDateKey(today));
+    setCarryOverState(DEFAULT_CARRY_OVER_STATE);
+    setExpenseDraftDateKey(getDateKey(currentDate));
     setAlertStateState(DEFAULT_ALERT_STATE);
     setAlertHistory([]);
   };
@@ -529,6 +683,10 @@ export default function App() {
     setSavingGoalSettings(nextSavingGoalSettings);
   };
 
+  const updateSavingGoals = (nextSavingGoals) => {
+    setSavingGoals(Array.isArray(nextSavingGoals) ? nextSavingGoals : []);
+  };
+
   const updateBudgetSettingsField = (field, value) => {
     setBudgetSettings((current) => ({
       ...current,
@@ -569,12 +727,19 @@ export default function App() {
     currentUser,
     dailyBudget,
     todaySpent,
+    currentDate,
     alertState,
     alertDismissed: alertStateState.dismissed,
     alertHistory,
-    fixedExpenseTotal,
+    fixedExpenseTotal: totalFixedExpense,
+    totalFixedExpense,
+    manualFixedExpenseAmount,
+    recurringTotal,
+    displayMonthSpent,
+    budgetMonthSpent,
     remainingDays,
     hasBudgetSetup,
+    monthlyJudgmentSnapshot,
   };
 
   return (
@@ -604,10 +769,16 @@ export default function App() {
                   monthlyIncome={monthlyIncome}
                   budgetSettings={budgetSettings}
                   savingGoalSettings={savingGoalSettings}
+                  savingGoals={savingGoals}
                   recurringExpenses={recurringExpenses}
+                  currentDate={currentDate}
                   dailyBudget={dailyBudget}
                   remainingDays={remainingDays}
+                  totalFixedExpense={totalFixedExpense}
+                  automaticCarryOverAmount={automaticCarryOverAmount}
+                  monthlyJudgmentSnapshot={monthlyJudgmentSnapshot}
                   onSave={updateBudgetSettings}
+                  onSavingGoalsChange={updateSavingGoals}
                   onToggleChange={updateBudgetSettingsField}
                   showToast={showToast}
                 />
@@ -621,9 +792,11 @@ export default function App() {
                 <ExpenseRecords
                   expenseRecords={expenseRecords}
                   recurringExpenses={recurringExpenses}
+                  currentDate={currentDate}
                   selectedDateKey={expenseDraftDateKey}
                   dailyBudget={dailyBudget}
                   todaySpent={todaySpent}
+                  hasBudgetSetup={hasBudgetSetup}
                   onAddExpenseRecord={addExpenseRecord}
                   onUpdateExpenseRecord={updateExpenseRecord}
                   onDeleteExpenseRecord={deleteExpenseRecord}
@@ -639,7 +812,11 @@ export default function App() {
             path="/calendar"
             element={
               <RequireAuth isAuthed={isAuthed}>
-                <Calendar expenseRecords={expenseRecords} onSelectDate={setExpenseDraftDateKey} />
+                <Calendar
+                  expenseRecords={expenseRecords}
+                  currentDate={currentDate}
+                  onSelectDate={setExpenseDraftDateKey}
+                />
               </RequireAuth>
             }
           />
@@ -647,7 +824,11 @@ export default function App() {
             path="/statistics"
             element={
               <RequireAuth isAuthed={isAuthed}>
-                <Statistics expenseRecords={expenseRecords} recurringExpenses={recurringExpenses} />
+                <Statistics
+                  expenseRecords={expenseRecords}
+                  recurringExpenses={recurringExpenses}
+                  currentDate={currentDate}
+                />
               </RequireAuth>
             }
           />
